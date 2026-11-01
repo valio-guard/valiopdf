@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from dravenpdf import TemplateError
-from dravenpdf.render.templates import render_template
+from valiopdf import TemplateError
+from valiopdf.render.templates import render_template
 
 
 def test_string_template() -> None:

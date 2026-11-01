@@ -16,7 +16,7 @@ import pytest
 from playwright.async_api import Page
 
 from conftest import REQUEST_LOG, Server, pdf_text, requests_tagged
-from dravenpdf import (
+from valiopdf import (
     AsyncRenderer,
     BlockedRequestError,
     Cookie,
@@ -276,7 +276,7 @@ SOURCE_PAGE = """<p>SOURCE PAGE</p>
 <img src="{other}">
 <p id="api"></p><script>
 fetch('{api}').then(r => r.text()).catch(() => 'API-FAILED').then(t => {{
-  document.getElementById('api').textContent = t; window.__DRAVENPDF_READY__ = true; }});
+  document.getElementById('api').textContent = t; window.__VALIOPDF_READY__ = true; }});
 </script>"""
 
 
@@ -438,7 +438,7 @@ async def indexed_db_login(renderer: AsyncRenderer, server: Server, token: str) 
     async with renderer.pool.context() as ctx:
         page = await ctx.new_page()
         await page.goto(server.url(f"/auth/idb-write?token={token}"))
-        await page.wait_for_function("window.__DRAVENPDF_READY__ === true")
+        await page.wait_for_function("window.__VALIOPDF_READY__ === true")
         state = await ctx.storage_state(indexed_db=True)
     assert state["origins"][0]["indexedDB"]
     return RenderAuth(storage_state=StorageState.model_validate(state))

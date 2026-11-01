@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from dravenpdf import AssetError
-from dravenpdf.render.assets import MAX_FILES, ORIGIN, AssetBundle, check_path, content_type
+from valiopdf import AssetError
+from valiopdf.render.assets import MAX_FILES, ORIGIN, AssetBundle, check_path, content_type
 
 
 @pytest.mark.parametrize("path", ["a.css", "css/site.css", "img/deep/logo.png", "my file.png"])
@@ -51,10 +51,10 @@ def test_lookup(bundle: AssetBundle, url: str, expected: tuple[bytes, str] | Non
     ("url", "owned"),
     [
         (ORIGIN + "/x", True),
-        ("https://BUNDLE.dravenpdf.invalid/x", True),
-        ("http://bundle.dravenpdf.invalid/x", False),
-        ("wss://bundle.dravenpdf.invalid/x", False),
-        ("https://bundle.dravenpdf.invalid.evil.example/x", False),
+        ("https://BUNDLE.valiopdf.invalid/x", True),
+        ("http://bundle.valiopdf.invalid/x", False),
+        ("wss://bundle.valiopdf.invalid/x", False),
+        ("https://bundle.valiopdf.invalid.evil.example/x", False),
     ],
 )
 def test_owns(url: str, owned: bool) -> None:

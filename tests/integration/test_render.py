@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from conftest import SVG, Server, page_size, pdf_text
-from dravenpdf import (
+from valiopdf import (
     AsyncRenderer,
     BlockedRequestError,
     BrowserPool,
@@ -40,10 +40,10 @@ def assert_size(actual: tuple[float, float], expected: tuple[float, float]) -> N
 
 
 async def test_html_to_a4(renderer: AsyncRenderer) -> None:
-    doc = await renderer.from_html("<h1>Hello dravenpdf</h1>")
+    doc = await renderer.from_html("<h1>Hello valiopdf</h1>")
 
     assert doc.page_count == 1
-    assert "Hello dravenpdf" in pdf_text(doc)[0]
+    assert "Hello valiopdf" in pdf_text(doc)[0]
     assert_size(page_size(doc), A4)
 
 
@@ -115,7 +115,7 @@ async def test_wait_for_selector(renderer: AsyncRenderer) -> None:
 
 async def test_wait_for_ready_flag(renderer: AsyncRenderer) -> None:
     html = """<body><script>setTimeout(() => {
-      document.body.append('CHART DRAWN'); window.__DRAVENPDF_READY__ = true; }, 800);
+      document.body.append('CHART DRAWN'); window.__VALIOPDF_READY__ = true; }, 800);
     </script></body>"""
 
     doc = await renderer.from_html(html, RenderOptions(wait_for_ready_flag=True))
@@ -271,7 +271,7 @@ async def test_concurrent_renders() -> None:
 
 async def test_queue_full_raises_pool_exhausted() -> None:
     slow = RenderOptions(wait_for_ready_flag=True, timeout_ms=5000)
-    html = "<script>setTimeout(() => window.__DRAVENPDF_READY__ = true, 1500)</script>"
+    html = "<script>setTimeout(() => window.__VALIOPDF_READY__ = true, 1500)</script>"
 
     async with AsyncRenderer(max_concurrency=1, max_queue=0) as r:
         first = asyncio.create_task(r.from_html(html, slow))
@@ -285,7 +285,7 @@ async def test_queue_full_raises_pool_exhausted() -> None:
 
 async def test_timeout_counts_time_waiting_for_a_slot() -> None:
     slow = RenderOptions(wait_for_ready_flag=True, timeout_ms=5000)
-    html = "<script>setTimeout(() => window.__DRAVENPDF_READY__ = true, 1500)</script>"
+    html = "<script>setTimeout(() => window.__VALIOPDF_READY__ = true, 1500)</script>"
 
     async with AsyncRenderer(max_concurrency=1) as r:
         first = asyncio.create_task(r.from_html(html, slow))

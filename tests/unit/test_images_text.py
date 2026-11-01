@@ -9,10 +9,10 @@ import pypdfium2 as pdfium
 import pytest
 from PIL import Image
 
-from dravenpdf import LimitExceededError, PdfDocument, PdfOperationError
-from dravenpdf.document import _pdfium
-from dravenpdf.document import images as image_ops
-from dravenpdf.document.images import PAPER_SIZES_PT
+from valiopdf import LimitExceededError, PdfDocument, PdfOperationError
+from valiopdf.document import _pdfium
+from valiopdf.document import images as image_ops
+from valiopdf.document.images import PAPER_SIZES_PT
 
 
 def image_bytes(fmt: str, size: tuple[int, int] = (80, 40), mode: str = "RGB") -> bytes:

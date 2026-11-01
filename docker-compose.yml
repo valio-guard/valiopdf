@@ -1,17 +1,17 @@
 services:
-  dravenpdf:
+  valiopdf:
     build: .
-    image: dravenpdf:latest
+    image: valiopdf:latest
     init: true            # reaps Chromium child processes
     ports:
-      - "127.0.0.1:${DRAVENPDF_PORT:-8000}:8000"
+      - "127.0.0.1:${VALIOPDF_PORT:-8000}:8000"
     environment:
-      DRAVENPDF_API_KEY: ${DRAVENPDF_API_KEY:?set DRAVENPDF_API_KEY}
-      DRAVENPDF_MAX_CONCURRENCY: ${DRAVENPDF_MAX_CONCURRENCY:-2}
-      DRAVENPDF_WORKERS: ${DRAVENPDF_WORKERS:-1}
-      # DRAVENPDF_ALLOWED_HOSTS: "cdn.example.com,*.example.org"
+      VALIOPDF_API_KEY: ${VALIOPDF_API_KEY:?set VALIOPDF_API_KEY}
+      VALIOPDF_MAX_CONCURRENCY: ${VALIOPDF_MAX_CONCURRENCY:-2}
+      VALIOPDF_WORKERS: ${VALIOPDF_WORKERS:-1}
+      # VALIOPDF_ALLOWED_HOSTS: "cdn.example.com,*.example.org"
       # Signing keys stay on the server (mount them read-only):
-      # DRAVENPDF_SIGNING_KEYS: '{"company": {"pkcs12": "/keys/company.p12", "password_file": "/run/secrets/company"}}'
-      # DRAVENPDF_TIMESTAMP_URL: "https://tsa.example/"
-      # DRAVENPDF_TRUST_ROOTS: "/keys/ca.pem"
+      # VALIOPDF_SIGNING_KEYS: '{"company": {"pkcs12": "/keys/company.p12", "password_file": "/run/secrets/company"}}'
+      # VALIOPDF_TIMESTAMP_URL: "https://tsa.example/"
+      # VALIOPDF_TRUST_ROOTS: "/keys/ca.pem"
     restart: unless-stopped

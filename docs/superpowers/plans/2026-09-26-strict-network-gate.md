@@ -32,21 +32,21 @@
 ## File map
 
 - `pyproject.toml`, `uv.lock`: Python floor and mitmproxy/cryptography direct dependencies.
-- `src/dravenpdf/render/_proxy_ca.py`: temporary pool CA creation, scoped Chromium SPKI trust, cleanup.
-- `src/dravenpdf/render/_proxy_protocol.py`: private startup/block/fatal event format and redaction.
-- `src/dravenpdf/render/_proxy_addon.py`: mitmdump CONNECT/request/header checks, in-memory bundle responses, exact-origin headers, fail-closed hook wrapper.
-- `src/dravenpdf/render/_proxy_gate.py`: per-render subprocess, private files and control channel, readiness, block events, teardown.
-- `src/dravenpdf/render/guards.py`: policy reused by addon and local-file routing only; remove manual HTTP redirect fetch.
-- `src/dravenpdf/render/pool.py`: pool CA lifecycle and scoped browser launch trust.
-- `src/dravenpdf/render/renderer.py`: start gate, create proxied context, and close context before gate.
-- `src/dravenpdf/render/assets.py`: share bundle response data with the addon.
+- `src/valiopdf/render/_proxy_ca.py`: temporary pool CA creation, scoped Chromium SPKI trust, cleanup.
+- `src/valiopdf/render/_proxy_protocol.py`: private startup/block/fatal event format and redaction.
+- `src/valiopdf/render/_proxy_addon.py`: mitmdump CONNECT/request/header checks, in-memory bundle responses, exact-origin headers, fail-closed hook wrapper.
+- `src/valiopdf/render/_proxy_gate.py`: per-render subprocess, private files and control channel, readiness, block events, teardown.
+- `src/valiopdf/render/guards.py`: policy reused by addon and local-file routing only; remove manual HTTP redirect fetch.
+- `src/valiopdf/render/pool.py`: pool CA lifecycle and scoped browser launch trust.
+- `src/valiopdf/render/renderer.py`: start gate, create proxied context, and close context before gate.
+- `src/valiopdf/render/assets.py`: share bundle response data with the addon.
 - `tests/integration/test_proxy_gate.py`: wire-level feasibility and failure tests.
 - `tests/integration/test_cookie_https.py`, `tests/integration/test_auth.py`, `tests/integration/test_guard_network.py`, `tests/unit/test_guards.py`: cookie/source matrix and regressions.
 - `docs/decisions.md`, `docs/architecture.md`, `docs/library-api.md`, `docs/roadmap.md`, `CLAUDE.md`, `README.md`: observed behavior, security and compatibility changes.
 
 ## Task 1: Prove mandatory proxy transport and scoped trust
 
-**Files:** Create `tests/integration/test_proxy_gate.py`, `src/dravenpdf/render/_proxy_ca.py`; modify `pyproject.toml`, `uv.lock` and `src/dravenpdf/render/pool.py` for the dependency and CA lifecycle.
+**Files:** Create `tests/integration/test_proxy_gate.py`, `src/valiopdf/render/_proxy_ca.py`; modify `pyproject.toml`, `uv.lock` and `src/valiopdf/render/pool.py` for the dependency and CA lifecycle.
 
 **Interfaces:** `ProxyCA.create() -> ProxyCA`, `.confdir: Path`, `.spki_hash: str`, `.close() -> None`; `BrowserPool` adds that SPKI at Chromium launch. The test may start `mitmdump` directly before `_proxy_gate.py` exists.
 
@@ -58,7 +58,7 @@
 
 ## Task 2: Build and test the proxy policy addon
 
-**Files:** Create `src/dravenpdf/render/_proxy_protocol.py`, `src/dravenpdf/render/_proxy_addon.py`, `tests/unit/test_proxy_addon.py`; modify `src/dravenpdf/render/assets.py` to share bundle response data and `src/dravenpdf/render/guards.py` to expose a serializable policy snapshot.
+**Files:** Create `src/valiopdf/render/_proxy_protocol.py`, `src/valiopdf/render/_proxy_addon.py`, `tests/unit/test_proxy_addon.py`; modify `src/valiopdf/render/assets.py` to share bundle response data and `src/valiopdf/render/guards.py` to expose a serializable policy snapshot.
 
 **Interfaces:** `ProxyPolicy` is a serializable snapshot of allowed hosts, private-network setting, bundle manifest, exact-origin headers and deadline. `_proxy_addon` reads that snapshot from a mode-0600 file; its `http_connect`, `requestheaders`, and WebSocket-related hooks return an explicit block on policy errors. `_proxy_protocol` carries `ready`, `blocked`, and `fatal` messages without header values.
 
@@ -70,7 +70,7 @@
 
 ## Task 3: Wire the proxy into render lifecycle
 
-**Files:** Create `src/dravenpdf/render/_proxy_gate.py`; modify `src/dravenpdf/render/pool.py`, `src/dravenpdf/render/renderer.py`, `src/dravenpdf/render/guards.py`, `tests/unit/test_guards.py`, `tests/integration/test_proxy_gate.py`.
+**Files:** Create `src/valiopdf/render/_proxy_gate.py`; modify `src/valiopdf/render/pool.py`, `src/valiopdf/render/renderer.py`, `src/valiopdf/render/guards.py`, `tests/unit/test_guards.py`, `tests/integration/test_proxy_gate.py`.
 
 **Interfaces:** `ProxyGate.start(policy: ProxyPolicy, ca: ProxyCA, deadline: float) -> ProxyGate`, `.proxy_options: dict[str, str]`, `.blocked: list[tuple[str, str]]`, `.fatal: bool`, `.close() -> None`; `BrowserPool` exposes its CA to a context lease. The gate is started before `pool.context(...)`, and closed after the context exits.
 

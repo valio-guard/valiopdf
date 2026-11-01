@@ -8,8 +8,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import Server, pdf_text
-from dravenpdf import PdfDocument
-from dravenpdf.server.config import Settings
+from valiopdf import PdfDocument
+from valiopdf.server.config import Settings
 
 from .conftest import API_KEY, AUTH, make_client, pdf_bytes
 
@@ -114,7 +114,7 @@ def test_render_bundle(live: TestClient) -> None:
     text = pdf_text(PdfDocument.from_bytes(response.content))[0]
     assert "Bundled CSS-OK" in text
     assert "IMG-OK" in text
-    assert response.headers["x-dravenpdf-resource-errors"] == "1"  # img/missing.png
+    assert response.headers["x-valiopdf-resource-errors"] == "1"  # img/missing.png
 
 
 def test_render_url_behind_a_login(server: Server, caplog: pytest.LogCaptureFixture) -> None:
@@ -148,7 +148,7 @@ def test_render_html_and_bundle_with_auth(server: Server) -> None:
     page = (
         "<p id='api'></p><script>"
         f"fetch('{server.url('/auth/cors-api')}').then(r => r.text()).then(t => {{"
-        "document.getElementById('api').textContent = t; window.__DRAVENPDF_READY__ = true; });"
+        "document.getElementById('api').textContent = t; window.__VALIOPDF_READY__ = true; });"
         "</script>"
     )
     auth = {"headers": {origin: {"X-Tenant": "acme"}}}

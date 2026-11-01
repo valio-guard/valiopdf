@@ -13,8 +13,8 @@ images, text) are covered by open-source libraries. Estimated effort: 3–5 week
 Rendering quality is identical (the same Chromium engine either way). Python's
 PDF editing libraries (pikepdf, pypdfium2) are stronger than Node's pdf-lib.
 
-## D3 – Package name `dravenpdf`
-Import name, distribution name and CLI command are all `dravenpdf`.
+## D3 – Package name `valiopdf`
+Import name, distribution name and CLI command are all `valiopdf`.
 
 ## D4 – One package, service as the `[server]` extra
 The service is a thin layer (a few hundred lines), and one package keeps

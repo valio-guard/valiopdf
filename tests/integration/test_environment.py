@@ -8,8 +8,8 @@ import pytest
 from typer.testing import CliRunner
 
 from conftest import pdf_text
-from dravenpdf import AsyncRenderer, PdfDocument, RenderOptions, Viewport
-from dravenpdf.cli import app
+from valiopdf import AsyncRenderer, PdfDocument, RenderOptions, Viewport
+from valiopdf.cli import app
 
 pytestmark = pytest.mark.browser
 

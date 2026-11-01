@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from dravenpdf import HeaderFooter, Margins, RenderOptions, Viewport
+from valiopdf import HeaderFooter, Margins, RenderOptions, Viewport
 
 
 def test_defaults_map_to_a4_portrait() -> None:

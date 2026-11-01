@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from conftest import pdf_text
-from dravenpdf import AsyncRenderer, PdfDocument
+from valiopdf import AsyncRenderer, PdfDocument
 
 pytestmark = pytest.mark.browser
 

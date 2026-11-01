@@ -27,7 +27,7 @@ test-all:
 check: lint typecheck test
 
 serve:
-	DRAVENPDF_API_KEY=$${DRAVENPDF_API_KEY:-dev} uv run dravenpdf serve
+	VALIOPDF_API_KEY=$${VALIOPDF_API_KEY:-dev} uv run valiopdf serve
 
 docker:
-	docker build -t dravenpdf .
+	docker build -t valiopdf .

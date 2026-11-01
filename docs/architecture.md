@@ -3,7 +3,7 @@
 ## Overview
 
 ```
-            ┌──────────────── dravenpdf ────────────────┐
+            ┌──────────────── valiopdf ────────────────┐
  HTML/URL → │ render/  ──(Chromium via Playwright)──► PDF bytes │
  template   │                     │                      │
             │                     ▼                      │
@@ -22,14 +22,14 @@ server are thin adapters over these two layers and contain no PDF logic of their
 
 ```
 pdf/
-├── pyproject.toml              # package dravenpdf, extra: [server]
+├── pyproject.toml              # package valiopdf, extra: [server]
 ├── README.md
 ├── CLAUDE.md                   # agent entry point
 ├── docs/                       # this folder
 ├── Dockerfile                  # service image (Playwright base + fonts)
 ├── docker-compose.yml
 ├── Makefile
-├── src/dravenpdf/
+├── src/valiopdf/
 │   ├── __init__.py             # re-exports the public API
 │   ├── py.typed
 │   ├── options.py              # RenderOptions, Margins, PaperSize, HeaderFooter
@@ -56,14 +56,14 @@ pdf/
 │   │   ├── text.py             # text extraction
 │   │   ├── forms.py            # list, fill and flatten AcroForms
 │   │   └── signing.py          # sign (pyHanko) and verify signatures
-│   ├── cli.py                  # Typer app: `dravenpdf ...`
+│   ├── cli.py                  # Typer app: `valiopdf ...`
 │   └── server/                 # needs the [server] extra
 │       ├── app.py              # create_app(): lifespan starts/stops BrowserPool
-│       ├── config.py           # Settings (env prefix DRAVENPDF_)
+│       ├── config.py           # Settings (env prefix VALIOPDF_)
 │       ├── deps.py             # API key check, uploads, PDF/ZIP responses
 │       ├── middleware.py       # request ids, body size limit
 │       ├── metrics.py          # Prometheus registry
-│       ├── errors.py           # maps dravenpdf.errors → HTTP responses
+│       ├── errors.py           # maps valiopdf.errors → HTTP responses
 │       ├── schemas.py          # request/response models
 │       └── routes/
 │           ├── render.py       # /v1/render/*
@@ -91,7 +91,7 @@ custom width/height, orientation, margins, scale, header/footer HTML, page range
 
 ### `errors.py`
 ```
-DravenPdfError
+ValioPdfError
 ├── RenderError
 │   ├── RenderTimeoutError
 │   ├── IncompleteRenderError   # strict render found missing resources / script errors
@@ -107,7 +107,7 @@ DravenPdfError
 - **`pool.py` – `BrowserPool`**: owns Playwright, concurrency slots and a temporary
   proxy CA. Strict renders lease a dedicated Chromium process and fresh context so
   the browser-wide redirect observer cannot affect another render. The binary comes
-  from `executable_path` / `$DRAVENPDF_CHROMIUM_PATH`, else Playwright's download.
+  from `executable_path` / `$VALIOPDF_CHROMIUM_PATH`, else Playwright's download.
   An `asyncio.Semaphore` caps concurrent renders (`max_concurrency`); a bounded wait
   (`max_queue`) raises `PoolExhaustedError`. Browser launch and context creation are
   shielded so cancellation closes late contexts and does not leak partial startup.
@@ -121,7 +121,7 @@ DravenPdfError
   the proxy → release the slot → return a `PdfDocument`. A late context cleanup
   keeps its proxy alive until cleanup finishes.
 - **`assets.py`**: `AssetBundle` for `from_html(..., assets=...)`. The page loads from
-  `https://bundle.dravenpdf.invalid/` (a reserved domain that can't resolve); the
+  `https://bundle.valiopdf.invalid/` (a reserved domain that can't resolve); the
   proxy addon answers owned URLs from memory with the bundle's 200/404 behavior,
   before any upstream connection. Paths are validated with `check_path`.
 - **`report.py`**: `ReportCollector` listens to the page's `response`, `requestfailed`,
@@ -168,7 +168,7 @@ DravenPdfError
   pinning or client certificates; HTTP/3/QUIC is not supported by this proxy path.
 - **`waits.py`**: waits for `document.fonts.ready`, scrolls to trigger lazy images,
   waits for all `<img>` elements to load, and optionally waits for
-  `window.__DRAVENPDF_READY__ === true` (for pages that render with JS).
+  `window.__VALIOPDF_READY__ === true` (for pages that render with JS).
 - **`templates.py`**: a sandboxed Jinja2 environment with autoescaping on. Loads
   templates from a directory or a string. `from_template` with a `template_dir`
   first navigates to the folder's `file://` URL and then swaps in the rendered HTML,
@@ -220,15 +220,15 @@ save-and-reopen their result (`pages._detach`) before returning it.
   streams, stream compression, and removing unused objects. No Ghostscript.
 
 ### `cli.py`
-Typer app, entry point `dravenpdf` (and `python -m dravenpdf`). It only parses
+Typer app, entry point `valiopdf` (and `python -m valiopdf`). It only parses
 arguments, converts 1-based page strings with `parse_page_ranges`, and calls
-`Renderer` / `PdfDocument`. `main()` turns `DravenPdfError` into a one-line message.
+`Renderer` / `PdfDocument`. `main()` turns `ValioPdfError` into a one-line message.
 
 ### `server/`
 Endpoints are in [http-api.md](http-api.md).
 - **`app.py`**: `create_app(settings=None, renderer=None)`. The lifespan creates and
   starts one `AsyncRenderer` per worker process (tests can pass their own renderer).
-- **`config.py`**: `Settings` from `DRAVENPDF_*` variables; refuses to build without
+- **`config.py`**: `Settings` from `VALIOPDF_*` variables; refuses to build without
   an API key unless auth is disabled.
 - **`middleware.py`**: pure ASGI. `RequestIdMiddleware` (outermost) sets and logs
   `X-Request-ID`; `BodyLimitMiddleware` answers 413 both for a large Content-Length

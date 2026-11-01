@@ -1,0 +1,717 @@
+"""The ``valiopdf`` command line.
+
+A thin layer over the library: parse arguments, call ``Renderer`` / ``PdfDocument``,
+write files. Page arguments are 1-based range strings ("1,3-5,8-"), as people
+write them. ``-o -`` writes a single PDF to stdout.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from dataclasses import asdict
+from pathlib import Path
+from typing import Annotated, Any, NoReturn
+
+import typer
+from pydantic import ValidationError
+
+from valiopdf import __version__
+from valiopdf.document.images import ImageFormat
+from valiopdf.document.pages import optional_page_ranges, parse_page_ranges
+from valiopdf.document.pdf import PdfDocument
+from valiopdf.document.signing import SignatureBox, SigningKey, signature_problems
+from valiopdf.document.stamp import Position
+from valiopdf.errors import (
+    BlockedRequestError,
+    PdfOperationError,
+    PdfPasswordError,
+    ValioPdfError,
+    describe_validation_errors,
+)
+from valiopdf.options import (
+    ColorScheme,
+    HeaderFooter,
+    Margins,
+    MediaType,
+    PaperSize,
+    ReducedMotion,
+    RenderOptions,
+    Viewport,
+    WaitUntil,
+)
+from valiopdf.render.auth import RenderAuth, StorageState
+from valiopdf.render.sync import Renderer
+
+app = typer.Typer(
+    name="valiopdf",
+    help="HTML to PDF conversion and PDF tools.",
+    no_args_is_help=True,
+    add_completion=False,
+    pretty_exceptions_enable=False,
+)
+
+# Typer reads these annotations at runtime, so they use ... | None rather than X | None
+# inside Annotated where Typer needs the plain type.
+Output = Annotated[Path, typer.Option("--output", "-o", help="Output file, or - for stdout.")]
+OutDir = Annotated[Path, typer.Option("--output", "-o", help="Output folder.")]
+InputPdf = Annotated[Path, typer.Argument(exists=True, dir_okay=False, help="Input PDF.")]
+AuthFile = Annotated[
+    Path | None,
+    typer.Option(
+        "--auth",
+        exists=True,
+        dir_okay=False,
+        help="JSON credentials for the pages loaded: RenderAuth (cookies, storage_state, "
+        "headers) or a Playwright storage_state() file.",
+    ),
+]
+PagesOpt = Annotated[
+    str | None, typer.Option("--pages", help="1-based pages, e.g. 1,3-5,8- (default: all).")
+]
+
+
+def _fail(message: str) -> NoReturn:
+    typer.secho(f"error: {message}", fg=typer.colors.RED, err=True)
+    raise typer.Exit(1)
+
+
+def _load_auth(path: Path | None) -> RenderAuth | None:
+    """Read --auth. Messages never quote the file, which holds secrets."""
+    if path is None:
+        return None
+    try:
+        raw = json.loads(path.read_text())
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        _fail(f"--auth {path}: not a JSON file")
+    try:
+        if isinstance(raw, dict) and raw and set(raw) <= {"cookies", "origins"}:
+            # Playwright's context.storage_state() output, as saved.
+            return RenderAuth(storage_state=StorageState.model_validate(raw))
+        return RenderAuth.model_validate(raw)
+    except ValidationError as exc:
+        problems = describe_validation_errors(exc.errors(include_input=False))
+        _fail(f"--auth {path}: {problems}")
+
+
+def _read_json_object(path: Path, flag: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text())
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        _fail(f"{flag} {path}: not valid JSON")
+    if not isinstance(value, dict):
+        _fail(f"{flag} must contain a JSON object")
+    return value
+
+
+def _write_pdf(doc: PdfDocument, output: Path, *, compress: bool = False) -> None:
+    report = doc.render_report
+    if report is not None and not report.ok:
+        typer.secho(f"warning: {report.summary()}", fg=typer.colors.YELLOW, err=True)
+    data = doc.to_bytes(compress=compress)
+    if str(output) == "-":
+        sys.stdout.buffer.write(data)
+        sys.stdout.buffer.flush()
+    else:
+        output.write_bytes(data)
+        typer.echo(f"wrote {output} ({doc.page_count} page{'s' * (doc.page_count != 1)})", err=True)
+
+
+def _parse_viewport(value: str | None) -> Viewport | None:
+    if value is None:
+        return None
+    width, sep, height = value.lower().partition("x")
+    if not sep or not width.isdigit() or not height.isdigit():
+        _fail(f"--viewport must look like 1920x1080, not {value!r}")
+    return Viewport(width=int(width), height=int(height))
+
+
+def _is_url(value: str) -> bool:
+    return value.startswith(("http://", "https://"))
+
+
+def main() -> None:
+    """Entry point: run the app, turning library errors into one-line messages."""
+    try:
+        app()
+    except ValioPdfError as exc:
+        typer.secho(f"error: {exc.message}", fg=typer.colors.RED, err=True)
+        if isinstance(exc, PdfPasswordError) and "needs a password" in exc.message:
+            typer.echo("hint: remove the password first with `valiopdf decrypt`", err=True)
+        if isinstance(exc, PdfOperationError) and "restrict a permission" in exc.message:
+            typer.echo("hint: e.g. --user-password, or --no-copy / --no-print", err=True)
+        if isinstance(exc, BlockedRequestError) and "non-public" in exc.message:
+            typer.echo("hint: pass --allow-private to render local or internal addresses", err=True)
+        sys.exit(1)
+
+
+def _version(value: bool) -> None:
+    if value:
+        typer.echo(f"valiopdf {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _root(
+    version: Annotated[
+        bool, typer.Option("--version", callback=_version, is_eager=True, help="Show version.")
+    ] = False,
+) -> None:
+    pass
+
+
+# ---------------------------------------------------------------- rendering
+
+
+def _render_options(
+    paper: PaperSize,
+    landscape: bool,
+    margin: str | None,
+    header: Path | None,
+    footer: Path | None,
+    wait_until: WaitUntil,
+    wait_for: str | None,
+    wait_for_ready_flag: bool,
+    timeout: int,
+    media: MediaType,
+    **extra: Any,
+) -> RenderOptions:
+    fields: dict[str, Any] = {
+        "paper": paper,
+        "landscape": landscape,
+        "wait_until": wait_until,
+        "wait_for_selector": wait_for,
+        "wait_for_ready_flag": wait_for_ready_flag,
+        "timeout_ms": timeout * 1000,
+        "media": media,
+        **extra,
+    }
+    if margin is not None:
+        fields["margins"] = Margins(top=margin, right=margin, bottom=margin, left=margin)
+    if header is not None:
+        fields["header"] = HeaderFooter(html=header.read_text())
+    if footer is not None:
+        fields["footer"] = HeaderFooter(html=footer.read_text())
+    return RenderOptions(**fields)
+
+
+@app.command()
+def render(
+    source: Annotated[str, typer.Argument(help="HTML file or http(s) URL.")],
+    output: Output,
+    paper: Annotated[PaperSize, typer.Option(help="Paper size.")] = "A4",
+    landscape: Annotated[bool, typer.Option(help="Landscape orientation.")] = False,
+    margin: Annotated[
+        str | None, typer.Option(help="All four margins, e.g. 10mm (default 20mm/15mm).")
+    ] = None,
+    header: Annotated[
+        Path | None, typer.Option(exists=True, dir_okay=False, help="Header HTML file.")
+    ] = None,
+    footer: Annotated[
+        Path | None, typer.Option(exists=True, dir_okay=False, help="Footer HTML file.")
+    ] = None,
+    wait_until: Annotated[WaitUntil, typer.Option(help="Page load event to wait for.")] = (
+        "networkidle"
+    ),
+    wait_for: Annotated[
+        str | None, typer.Option(help="CSS selector to wait for before printing.")
+    ] = None,
+    wait_for_ready_flag: Annotated[
+        bool, typer.Option(help="Wait for window.__VALIOPDF_READY__ === true.")
+    ] = False,
+    media: Annotated[MediaType, typer.Option(help="CSS media: print or screen.")] = "print",
+    timeout: Annotated[int, typer.Option(help="Seconds before giving up.")] = 30,
+    allow_host: Annotated[
+        list[str] | None,
+        typer.Option(help="Only load from these hosts (repeatable; *.example.com allowed)."),
+    ] = None,
+    allow_private: Annotated[
+        bool, typer.Option(help="Allow private/localhost addresses, e.g. a local dev server.")
+    ] = False,
+    skip_blocked: Annotated[
+        bool, typer.Option(help="Render without blocked resources instead of failing.")
+    ] = False,
+    compress: Annotated[bool, typer.Option(help="Compress the output.")] = False,
+    fail_on_resource_errors: Annotated[
+        bool, typer.Option(help="Fail if an image, stylesheet, font or fetch fails to load.")
+    ] = False,
+    fail_on_page_errors: Annotated[
+        bool, typer.Option(help="Fail if the page throws a JavaScript error.")
+    ] = False,
+    viewport: Annotated[
+        str | None, typer.Option(help="Window size while loading, e.g. 1920x1080.")
+    ] = None,
+    device_scale_factor: Annotated[
+        float, typer.Option(help="1-4; higher gives sharper canvas charts.")
+    ] = 1.0,
+    locale: Annotated[str | None, typer.Option(help="Locale like de-DE.")] = None,
+    timezone: Annotated[str | None, typer.Option(help="Time zone like Europe/Berlin.")] = None,
+    color_scheme: Annotated[
+        ColorScheme | None, typer.Option(help="light, dark or no-preference.")
+    ] = None,
+    reduced_motion: Annotated[
+        ReducedMotion | None, typer.Option(help="reduce or no-preference.")
+    ] = None,
+    prefer_css_page_size: Annotated[
+        bool, typer.Option(help="Use the page size from CSS @page { size }.")
+    ] = False,
+    css_margins: Annotated[
+        bool, typer.Option(help="Send no margins; leave them to CSS @page rules.")
+    ] = False,
+    tagged: Annotated[bool, typer.Option(help="Write a tagged (accessible) PDF.")] = False,
+    outline: Annotated[bool, typer.Option(help="Add bookmarks from headings.")] = False,
+    wait_for_expression: Annotated[
+        str | None, typer.Option(help="JavaScript expression to wait for (truthy).")
+    ] = None,
+    auth: AuthFile = None,
+) -> None:
+    """Render an HTML file or a web page to PDF. Load problems are printed as warnings."""
+    render_auth = _load_auth(auth)
+    options = _render_options(
+        paper, landscape, margin, header, footer, wait_until, wait_for,
+        wait_for_ready_flag, timeout, media,
+        fail_on_resource_errors=fail_on_resource_errors,
+        fail_on_page_errors=fail_on_page_errors,
+        viewport=_parse_viewport(viewport),
+        device_scale_factor=device_scale_factor,
+        locale=locale,
+        timezone=timezone,
+        color_scheme=color_scheme,
+        reduced_motion=reduced_motion,
+        prefer_css_page_size=prefer_css_page_size,
+        tagged=tagged,
+        outline=outline,
+        wait_for_expression=wait_for_expression,
+    )  # fmt: skip
+    if css_margins:
+        if margin is not None:
+            _fail("use either --margin or --css-margins")
+        options = options.model_copy(update={"margins": None})
+    with Renderer(
+        allowed_hosts=allow_host,
+        allow_private_network=allow_private,
+        on_blocked="skip" if skip_blocked else "fail",
+    ) as renderer:
+        if _is_url(source):
+            doc = renderer.from_url(source, options, auth=render_auth)
+        else:
+            path = Path(source)
+            if not path.is_file():
+                _fail(f"no such file: {source}")
+            doc = renderer.from_file(path, options, auth=render_auth)
+    _write_pdf(doc, output, compress=compress)
+
+
+@app.command()
+def template(
+    template_file: Annotated[
+        Path, typer.Argument(exists=True, dir_okay=False, help="Jinja2 template file.")
+    ],
+    output: Output,
+    data: Annotated[
+        Path | None,
+        typer.Option(exists=True, dir_okay=False, help="JSON file with template data."),
+    ] = None,
+    paper: Annotated[PaperSize, typer.Option(help="Paper size.")] = "A4",
+    landscape: Annotated[bool, typer.Option(help="Landscape orientation.")] = False,
+    footer: Annotated[
+        Path | None, typer.Option(exists=True, dir_okay=False, help="Footer HTML file.")
+    ] = None,
+    allow_private: Annotated[bool, typer.Option(help="Allow private/localhost addresses.")] = False,
+    auth: AuthFile = None,
+) -> None:
+    """Render a Jinja2 template with JSON data. Assets load from the template's folder."""
+    render_auth = _load_auth(auth)
+    values = _read_json_object(data, "--data") if data is not None else {}
+    options = _render_options(
+        paper, landscape, None, None, footer, "networkidle", None, False, 30, "print"
+    )
+    with Renderer(allow_private_network=allow_private) as renderer:
+        doc = renderer.from_template(
+            template_file.name, values, options, template_dir=template_file.parent, auth=render_auth
+        )
+    _write_pdf(doc, output)
+
+
+# ---------------------------------------------------------------- page operations
+
+
+@app.command()
+def merge(
+    inputs: Annotated[list[Path], typer.Argument(exists=True, dir_okay=False, help="PDFs.")],
+    output: Output,
+) -> None:
+    """Merge PDFs in the order given."""
+    _write_pdf(PdfDocument.merge([PdfDocument.open(p) for p in inputs]), output)
+
+
+@app.command()
+def split(
+    input: InputPdf,
+    output: OutDir,
+    every: Annotated[int | None, typer.Option(help="Pages per part.")] = None,
+    ranges: Annotated[
+        list[str] | None, typer.Option("--range", help="One part per range (repeatable).")
+    ] = None,
+) -> None:
+    """Split a PDF into parts: part-1.pdf, part-2.pdf, ..."""
+    doc = PdfDocument.open(input)
+    parts = doc.iter_split(every=every, ranges=ranges)  # validates before anything is written
+    output.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for part in parts:  # not enumerate(): it would keep the previous part alive
+        count += 1
+        part.save(output / f"part-{count}.pdf")
+        del part
+    typer.echo(f"wrote {count} parts to {output}", err=True)
+
+
+@app.command()
+def extract(
+    input: InputPdf,
+    pages: Annotated[str, typer.Argument(help="1-based pages, e.g. 2-5,8.")],
+    output: Output,
+) -> None:
+    """Copy some pages into a new PDF."""
+    _write_pdf(PdfDocument.open(input).extract(pages), output)
+
+
+@app.command()
+def rotate(
+    input: InputPdf,
+    output: Output,
+    degrees: Annotated[int, typer.Option(help="Clockwise, a multiple of 90.")] = 90,
+    pages: PagesOpt = None,
+) -> None:
+    """Rotate pages."""
+    doc = PdfDocument.open(input)
+    _write_pdf(doc.rotate(degrees, optional_page_ranges(pages, doc.page_count)), output)
+
+
+@app.command()
+def delete(
+    input: InputPdf,
+    pages: Annotated[str, typer.Argument(help="1-based pages to remove, e.g. 1,3.")],
+    output: Output,
+) -> None:
+    """Remove pages."""
+    doc = PdfDocument.open(input)
+    _write_pdf(doc.delete(parse_page_ranges(pages, doc.page_count)), output)
+
+
+@app.command()
+def stamp(
+    input: InputPdf,
+    output: Output,
+    text: Annotated[str | None, typer.Option(help="Text watermark (cp1252).")] = None,
+    image: Annotated[
+        Path | None, typer.Option(exists=True, dir_okay=False, help="Image to stamp.")
+    ] = None,
+    html: Annotated[
+        Path | None, typer.Option(exists=True, dir_okay=False, help="HTML file to stamp.")
+    ] = None,
+    pdf: Annotated[
+        Path | None,
+        typer.Option(exists=True, dir_okay=False, help="PDF whose first page to overlay."),
+    ] = None,
+    opacity: Annotated[float | None, typer.Option(help="0-1.")] = None,
+    angle: Annotated[float, typer.Option(help="Text angle, degrees.")] = 45,
+    font_size: Annotated[float, typer.Option(help="Text size, points.")] = 48,
+    color: Annotated[str, typer.Option(help="Text color, #RRGGBB.")] = "#FF0000",
+    width: Annotated[float | None, typer.Option(help="Image width, points.")] = None,
+    position: Annotated[Position, typer.Option(help="Where to put it.")] = "center",
+    under: Annotated[bool, typer.Option(help="Put it behind the page content.")] = False,
+    pages: PagesOpt = None,
+) -> None:
+    """Stamp text, an image, HTML or another PDF's page onto pages."""
+    chosen = [x for x in (text, image, html, pdf) if x is not None]
+    if len(chosen) != 1:
+        _fail("give exactly one of --text, --image, --html or --pdf")
+    doc = PdfDocument.open(input)
+    targets = optional_page_ranges(pages, doc.page_count)
+    # opacity=None: each kind's own default (0.3 for text, else 1).
+    if text is not None:
+        result = doc.stamp_text(
+            text, font_size=font_size, color=color, opacity=opacity, angle=angle,
+            position=position, pages=targets, under=under,
+        )  # fmt: skip
+    elif image is not None:
+        result = doc.stamp_image(
+            image.read_bytes(), width=width, position=position, opacity=opacity,
+            pages=targets, under=under,
+        )  # fmt: skip
+    elif pdf is not None:
+        result = doc.overlay(PdfDocument.open(pdf), opacity=opacity, pages=targets, under=under)
+    else:
+        assert html is not None
+        markup = html.read_text()
+        with Renderer() as renderer:
+            result = renderer.stamp_html(doc, markup, opacity=opacity, pages=targets, under=under)
+    _write_pdf(result, output)
+
+
+@app.command()
+def metadata(
+    input: InputPdf,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write a copy with changes.")
+    ] = None,
+    title: Annotated[str | None, typer.Option(help='Set ("" removes).')] = None,
+    author: Annotated[str | None, typer.Option(help='Set ("" removes).')] = None,
+    subject: Annotated[str | None, typer.Option(help='Set ("" removes).')] = None,
+    keywords: Annotated[str | None, typer.Option(help='Set ("" removes).')] = None,
+) -> None:
+    """Show document info, or write a copy with fields changed."""
+    doc = PdfDocument.open(input)
+    changes = {"title": title, "author": author, "subject": subject, "keywords": keywords}
+    if all(v is None for v in changes.values()):
+        info = {"pages": doc.page_count, **doc.metadata}
+        typer.echo(json.dumps(info, indent=2, ensure_ascii=False))
+        return
+    if output is None:
+        _fail("give -o to write the changed copy")
+    _write_pdf(doc.set_metadata(**changes), output)
+
+
+@app.command("form-fields")
+def form_fields(input: InputPdf) -> None:
+    """Print the form's fields as JSON."""
+    fields = PdfDocument.open(input).form_fields()
+    typer.echo(json.dumps([asdict(f) for f in fields], indent=2, ensure_ascii=False))
+
+
+@app.command("fill-form")
+def fill_form(
+    input: InputPdf,
+    output: Output,
+    data: Annotated[
+        Path,
+        typer.Option(exists=True, dir_okay=False, help='JSON object: {"field": value, ...}.'),
+    ],
+    flatten: Annotated[bool, typer.Option(help="Burn the values in and remove the form.")] = False,
+) -> None:
+    """Fill form fields (text, true/false for checkboxes, option names)."""
+    values = _read_json_object(data, "--data")
+    _write_pdf(PdfDocument.open(input).fill_form(values, flatten=flatten), output)
+
+
+@app.command("flatten-form")
+def flatten_form(input: InputPdf, output: Output) -> None:
+    """Burn the current field values into the pages and remove the form."""
+    _write_pdf(PdfDocument.open(input).flatten_form(), output)
+
+
+@app.command()
+def sign(
+    input: InputPdf,
+    output: Output,
+    key: Annotated[
+        Path, typer.Option(exists=True, dir_okay=False, help="PKCS#12 (.p12 / .pfx) key file.")
+    ],
+    key_password: Annotated[
+        str,
+        typer.Option(
+            envvar="VALIOPDF_KEY_PASSWORD",
+            prompt=True,
+            hide_input=True,
+            prompt_required=False,
+            help="Key passphrase (env VALIOPDF_KEY_PASSWORD, else prompted).",
+        ),
+    ] = "",
+    reason: Annotated[str | None, typer.Option(help="Why it is signed.")] = None,
+    location: Annotated[str | None, typer.Option(help="Where it is signed.")] = None,
+    contact: Annotated[str | None, typer.Option(help="Signer contact.")] = None,
+    field_name: Annotated[str, typer.Option(help="Signature field name.")] = "Signature",
+    visible: Annotated[
+        str | None,
+        typer.Option(help="Visible signature: PAGE,X,Y,WIDTH,HEIGHT (1-based page, points)."),
+    ] = None,
+    timestamp_url: Annotated[
+        str | None, typer.Option(help="RFC 3161 timestamp server URL.")
+    ] = None,
+) -> None:
+    """Digitally sign a PDF. Sign last: any later change breaks the signature."""
+    box = None
+    if visible is not None:
+        parts = visible.split(",")
+        try:
+            page, x, y, width, height = (float(p) for p in parts)
+        except ValueError:
+            _fail("--visible must be PAGE,X,Y,WIDTH,HEIGHT, e.g. 1,50,50,200,60")
+        if page < 1 or page != int(page):
+            _fail("--visible PAGE is 1-based: 1 is the first page")
+        box = SignatureBox(page=int(page) - 1, x=x, y=y, width=width, height=height)
+    signing_key = SigningKey.from_pkcs12(key, key_password or None)
+    doc = PdfDocument.open(input).sign(
+        signing_key, field_name=field_name, reason=reason, location=location,
+        contact=contact, box=box, timestamp_url=timestamp_url,
+    )  # fmt: skip
+    _write_pdf(doc, output)
+
+
+@app.command()
+def verify(
+    input: InputPdf,
+    trust: Annotated[
+        list[Path] | None,
+        typer.Option(exists=True, dir_okay=False, help="Trusted CA certificate(s), PEM/DER."),
+    ] = None,
+    integrity_only: Annotated[
+        bool,
+        typer.Option(
+            "--integrity-only",
+            help="Only check that the signatures are intact; don't require a trusted signer.",
+        ),
+    ] = False,
+    password: Annotated[
+        str | None,
+        typer.Option(
+            envvar="VALIOPDF_PDF_PASSWORD",
+            help="Password of an encrypted file (env VALIOPDF_PDF_PASSWORD).",
+        ),
+    ] = None,
+) -> None:
+    """Check signatures; prints JSON. Exits with 1 unless the file is signed, every
+    signature is intact and trusted by a --trust root, and a signature covers the whole
+    file (no unsigned changes after the last one). Encrypted files are checked as they
+    are, with --password."""
+    roots = [p.read_bytes() for p in trust or []]
+    infos = PdfDocument.open(input, password=password).verify_signatures(roots, password=password)
+    typer.echo(json.dumps([asdict(i) | {"ok": i.ok} for i in infos], indent=2, default=str))
+    problems = signature_problems(infos, require_trust=not integrity_only)
+    for problem in problems:
+        typer.echo(problem, err=True)
+    if any("not trusted" in p for p in problems) and not roots:
+        typer.echo("hint: pass --trust CA.pem, or use --integrity-only", err=True)
+    if problems:
+        raise typer.Exit(1)
+
+
+@app.command()
+def encrypt(
+    input: InputPdf,
+    output: Output,
+    user_password: Annotated[
+        str,
+        typer.Option(
+            envvar="VALIOPDF_USER_PASSWORD",
+            help="Password to open the file (env VALIOPDF_USER_PASSWORD; empty = none).",
+        ),
+    ] = "",
+    owner_password: Annotated[
+        str | None,
+        typer.Option(
+            envvar="VALIOPDF_OWNER_PASSWORD",
+            help="Full-access password (env VALIOPDF_OWNER_PASSWORD; random if omitted).",
+        ),
+    ] = None,
+    allow_print: Annotated[bool, typer.Option("--allow-print/--no-print")] = True,
+    allow_copy: Annotated[bool, typer.Option("--allow-copy/--no-copy")] = True,
+    allow_modify: Annotated[bool, typer.Option("--allow-modify/--no-modify")] = True,
+    allow_annotate: Annotated[bool, typer.Option("--allow-annotate/--no-annotate")] = True,
+    allow_forms: Annotated[bool, typer.Option("--allow-forms/--no-forms")] = True,
+) -> None:
+    """Encrypt a PDF (AES-256). Prefer the env variables to passing passwords as
+    arguments, which other users on the machine can see in the process list."""
+    doc = PdfDocument.open(input).encrypt(
+        user_password=user_password, owner_password=owner_password,
+        allow_print=allow_print, allow_copy=allow_copy, allow_modify=allow_modify,
+        allow_annotate=allow_annotate, allow_forms=allow_forms,
+    )  # fmt: skip
+    _write_pdf(doc, output)
+
+
+@app.command()
+def decrypt(
+    input: InputPdf,
+    output: Output,
+    password: Annotated[
+        str,
+        typer.Option(
+            envvar="VALIOPDF_PDF_PASSWORD",
+            prompt=True,
+            hide_input=True,
+            help="The user or owner password (env VALIOPDF_PDF_PASSWORD, else prompted).",
+        ),
+    ],
+) -> None:
+    """Remove password protection."""
+    _write_pdf(PdfDocument.open(input, password=password).decrypt(), output)
+
+
+@app.command()
+def compress(input: InputPdf, output: Output) -> None:
+    """Rewrite a PDF smaller (object streams, recompression, unused resources)."""
+    before = input.stat().st_size
+    doc = PdfDocument.open(input)
+    _write_pdf(doc, output, compress=True)
+    if str(output) != "-":
+        typer.echo(f"{before} -> {output.stat().st_size} bytes", err=True)
+
+
+# ---------------------------------------------------------------- images and text
+
+
+@app.command()
+def images(
+    input: InputPdf,
+    output: OutDir,
+    dpi: Annotated[int, typer.Option(help="Resolution.")] = 150,
+    fmt: Annotated[ImageFormat, typer.Option("--format", help="png or jpeg.")] = "png",
+    pages: PagesOpt = None,
+) -> None:
+    """Render pages to images: page-1.png, page-2.png, ..."""
+    doc = PdfDocument.open(input)
+    targets = optional_page_ranges(pages, doc.page_count) or list(range(doc.page_count))
+    output.mkdir(parents=True, exist_ok=True)
+    extension = "jpg" if fmt == "jpeg" else "png"
+    for index, data in zip(targets, doc.to_images(dpi=dpi, fmt=fmt, pages=targets), strict=True):
+        (output / f"page-{index + 1}.{extension}").write_bytes(data)
+    typer.echo(f"wrote {len(targets)} images to {output}", err=True)
+
+
+@app.command("from-images")
+def from_images(
+    inputs: Annotated[list[Path], typer.Argument(exists=True, dir_okay=False, help="Images.")],
+    output: Output,
+    paper: Annotated[
+        PaperSize | None, typer.Option(help="Fit onto this paper (default: image size).")
+    ] = None,
+    landscape: Annotated[bool, typer.Option(help="Landscape paper.")] = False,
+    margin: Annotated[float, typer.Option(help="Margin in points, with --paper.")] = 0,
+) -> None:
+    """One PDF page per image."""
+    doc = PdfDocument.from_images(
+        [p.read_bytes() for p in inputs], paper=paper, landscape=landscape, margin=margin
+    )
+    _write_pdf(doc, output)
+
+
+@app.command()
+def text(input: InputPdf) -> None:
+    """Print the text of each page (pages separated by form feeds)."""
+    typer.echo("\f".join(PdfDocument.open(input).extract_text()))
+
+
+# ---------------------------------------------------------------- server
+
+
+@app.command()
+def serve(
+    host: Annotated[str, typer.Option(help="Interface to listen on.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port.")] = 8000,
+    workers: Annotated[int, typer.Option(help="Worker processes (one Chromium each).")] = 1,
+) -> None:
+    """Run the HTTP service (needs the \\[server] extra and VALIOPDF_API_KEY)."""
+    try:
+        import uvicorn
+    except ImportError:
+        _fail('the HTTP service needs the server extra: pip install "valiopdf[server]"')
+    uvicorn.run(
+        "valiopdf.server.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        workers=workers,
+        proxy_headers=True,
+    )

@@ -10,8 +10,8 @@ import pytest
 from pydantic import SecretStr
 from typer.testing import CliRunner
 
-from dravenpdf import PdfDocument, PdfOperationError, PdfPasswordError
-from dravenpdf.cli import app
+from valiopdf import PdfDocument, PdfOperationError, PdfPasswordError
+from valiopdf.cli import app
 
 SECRET = "correct-horse-battery"
 
@@ -117,7 +117,7 @@ def test_cli_encrypt_and_decrypt(tmp_path: Path) -> None:
     enc = runner.invoke(
         app,
         ["encrypt", str(tmp_path / "in.pdf"), "-o", str(tmp_path / "enc.pdf"), "--no-copy"],
-        env={"DRAVENPDF_USER_PASSWORD": SECRET},
+        env={"VALIOPDF_USER_PASSWORD": SECRET},
     )
     dec = runner.invoke(
         app,
@@ -137,7 +137,7 @@ def test_cli_encrypt_needs_something_to_do(tmp_path: Path) -> None:
 
     # The rule is the library's, so run main(), which turns it into a message.
     completed = subprocess.run(
-        [sys.executable, "-m", "dravenpdf", "encrypt", str(tmp_path / "in.pdf"),
+        [sys.executable, "-m", "valiopdf", "encrypt", str(tmp_path / "in.pdf"),
          "-o", str(tmp_path / "x.pdf")],
         capture_output=True, text=True, check=False,
     )  # fmt: skip
@@ -152,13 +152,13 @@ def test_cli_hint_for_encrypted_input(tmp_path: Path) -> None:
     (tmp_path / "enc.pdf").write_bytes(sample().encrypt(user_password=SECRET).to_bytes())
 
     completed = subprocess.run(
-        [sys.executable, "-m", "dravenpdf", "rotate", str(tmp_path / "enc.pdf"), "-o", "x.pdf"],
+        [sys.executable, "-m", "valiopdf", "rotate", str(tmp_path / "enc.pdf"), "-o", "x.pdf"],
         capture_output=True, text=True, check=False,
     )  # fmt: skip
 
     assert completed.returncode == 1
     assert "needs a password" in completed.stderr
-    assert "dravenpdf decrypt" in completed.stderr
+    assert "valiopdf decrypt" in completed.stderr
 
 
 def test_encrypt_needs_a_password_or_a_restriction() -> None:

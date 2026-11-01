@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from dravenpdf import FailedRequest, HttpError, IncompleteRenderError, RenderReport
-from dravenpdf.render.report import ReportCollector
+from valiopdf import FailedRequest, HttpError, IncompleteRenderError, RenderReport
+from valiopdf.render.report import ReportCollector
 
 
 def test_empty_report_is_ok() -> None:

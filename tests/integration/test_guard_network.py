@@ -13,7 +13,7 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Page
 
 from conftest import Server, pdf_text, requests_tagged
-from dravenpdf import AsyncRenderer, BlockedRequestError, RenderOptions
+from valiopdf import AsyncRenderer, BlockedRequestError, RenderOptions
 
 pytestmark = pytest.mark.browser
 
@@ -35,7 +35,7 @@ async def ws_port() -> AsyncIterator[int]:
 def socket_page(url: str) -> str:
     return f"""<p id="out">waiting</p><script>
     const out = document.getElementById('out');
-    const done = text => {{ out.textContent = text; window.__DRAVENPDF_READY__ = true; }};
+    const done = text => {{ out.textContent = text; window.__VALIOPDF_READY__ = true; }};
     const ws = new WebSocket('{url}');
     ws.onopen = () => ws.send('hi');
     ws.onmessage = e => done(e.data);

@@ -11,8 +11,8 @@ from types import SimpleNamespace
 import pytest
 from mitmproxy import connection, ctx, http, tcp, udp
 
-from dravenpdf.render._proxy_addon import ProxyAddon
-from dravenpdf.render._proxy_protocol import ProxyPolicy, send_event
+from valiopdf.render._proxy_addon import ProxyAddon
+from valiopdf.render._proxy_protocol import ProxyPolicy, send_event
 
 
 async def resolve(host: str) -> list[str]:
@@ -31,7 +31,7 @@ def flow(
     elif host is not None:
         result.request.headers["Host"] = host
     if credential:
-        encoded = base64.b64encode(f"dravenpdf:{credential}".encode()).decode()
+        encoded = base64.b64encode(f"valiopdf:{credential}".encode()).decode()
         result.request.headers["Proxy-Authorization"] = "Basic " + encoded
     return result
 
@@ -143,14 +143,14 @@ async def test_proxy_credential_is_removed_on_reused_connection() -> None:
 
 async def test_bundle_hit_and_miss_never_open_upstream() -> None:
     proxy, _ = addon(bundle={"html": "PHA+ZG9jPC9wPg==", "files": {}})
-    hit = flow("GET", "https://bundle.dravenpdf.invalid/", host="bundle.dravenpdf.invalid")
+    hit = flow("GET", "https://bundle.valiopdf.invalid/", host="bundle.valiopdf.invalid")
     await proxy.requestheaders(hit)
     assert hit.response is not None
     assert hit.response.status_code == 200
     assert hit.response.content == b"<p>doc</p>"
     assert hit.response.headers["Cache-Control"] == "no-store"
     assert hit.server_conn.address is None
-    miss = flow("GET", "https://bundle.dravenpdf.invalid/missing", host="bundle.dravenpdf.invalid")
+    miss = flow("GET", "https://bundle.valiopdf.invalid/missing", host="bundle.valiopdf.invalid")
     await proxy.requestheaders(miss)
     assert miss.response is not None
     assert miss.response.status_code == 404
@@ -161,7 +161,7 @@ async def test_bundle_hit_and_miss_never_open_upstream() -> None:
 async def test_other_control_host_paths_get_a_quiet_local_404() -> None:
     proxy, events = addon()
     favicon = flow(
-        "GET", "http://proxy.dravenpdf.invalid/favicon.ico", host="proxy.dravenpdf.invalid"
+        "GET", "http://proxy.valiopdf.invalid/favicon.ico", host="proxy.valiopdf.invalid"
     )
     await proxy.requestheaders(favicon)
     assert favicon.response is not None

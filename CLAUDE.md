@@ -5,7 +5,7 @@ then the relevant file in `docs/`.
 
 ## What this project is
 
-**dravenpdf** is a Python library and HTTP service that converts HTML to PDF and
+**valiopdf** is a Python library and HTTP service that converts HTML to PDF and
 works with existing PDFs. It aims to match the core features of commercial
 libraries like IronPDF, but uses open-source parts:
 
@@ -41,7 +41,7 @@ Update that file (and the status line in `README.md`) as milestones land.
 
 ## Decisions already made (don't reopen without asking the user)
 
-1. Package name is **`dravenpdf`** (import `dravenpdf`, CLI `dravenpdf`).
+1. Package name is **`valiopdf`** (import `valiopdf`, CLI `valiopdf`).
 2. **One package**; the HTTP service is the optional `[server]` extra.
 3. **No PDF/A and no Ghostscript** (AGPL). Do not add Ghostscript as a dependency.
 4. HTTP auth is a **single API key** in the `X-API-Key` header.
@@ -77,7 +77,7 @@ Full reasoning is in `docs/decisions.md`.
   PDF work with `asyncio.to_thread`; keep route handlers thin. Tests in `tests/server/`
   use a `FakeRenderer` so they don't need Chromium.
 - CLI and HTTP page arguments are 1-based strings; the Python API is 0-based.
-- Raise the exceptions from `dravenpdf.errors`, not bare `Exception`s. The
+- Raise the exceptions from `valiopdf.errors`, not bare `Exception`s. The
   server maps them to HTTP status codes in one place.
 - Every Playwright render uses a **dedicated Chromium process**, fresh context and
   per-render proxy. Start `ProxyGate` before creating the context and close the
@@ -130,9 +130,9 @@ uv run mypy src
 uv run pytest -m "not browser"       # fast, no Chromium
 uv run pytest                        # full suite
 # If the installed Chromium doesn't match Playwright's version (e.g. a preinstalled
-# one), point at it: DRAVENPDF_CHROMIUM_PATH=/path/to/chrome uv run pytest
+# one), point at it: VALIOPDF_CHROMIUM_PATH=/path/to/chrome uv run pytest
 make check                           # lint + typecheck + unit tests
-uv run dravenpdf render in.html -o out.pdf   # CLI; see `dravenpdf --help`
-DRAVENPDF_API_KEY=dev uv run dravenpdf serve  # HTTP service on :8000, docs at /docs
-DRAVENPDF_API_KEY=dev uv run uvicorn dravenpdf.server.app:create_app --factory --reload
+uv run valiopdf render in.html -o out.pdf   # CLI; see `valiopdf --help`
+VALIOPDF_API_KEY=dev uv run valiopdf serve  # HTTP service on :8000, docs at /docs
+VALIOPDF_API_KEY=dev uv run uvicorn valiopdf.server.app:create_app --factory --reload
 ```

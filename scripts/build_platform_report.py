@@ -1,7 +1,7 @@
-"""Capture platform views and render a self-contained HTML report through dravenpdf.
+"""Capture platform views and render a self-contained HTML report through valiopdf.
 
 Run from the repository root with ``.venv/bin/python scripts/build_platform_report.py``.
-The PDF service key comes from DRAVENPDF_API_KEY or the local .env file.
+The PDF service key comes from VALIOPDF_API_KEY or the local .env file.
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def render_report(
         files=files,
     )
     response.raise_for_status()
-    if int(response.headers.get("X-DravenPdf-Resource-Errors", "0")):
+    if int(response.headers.get("X-ValioPdf-Resource-Errors", "0")):
         raise ValueError("PDF service reported a resource error")
     if response.headers.get("Content-Type", "").split(";", 1)[0] != "application/pdf":
         raise ValueError("PDF service did not return application/pdf")
@@ -99,14 +99,14 @@ def render_report(
 
 
 def _api_key(env_file: Path) -> str:
-    key = os.environ.get("DRAVENPDF_API_KEY")
+    key = os.environ.get("VALIOPDF_API_KEY")
     if key:
         return key
     if env_file.is_file():
         for line in env_file.read_text(encoding="utf-8").splitlines():
-            if line.startswith("DRAVENPDF_API_KEY="):
+            if line.startswith("VALIOPDF_API_KEY="):
                 return line.partition("=")[2].strip().strip("\"'")
-    raise ValueError("set DRAVENPDF_API_KEY or provide an .env file containing it")
+    raise ValueError("set VALIOPDF_API_KEY or provide an .env file containing it")
 
 
 async def capture_views(

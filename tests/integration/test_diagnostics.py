@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from conftest import Server
-from dravenpdf import AsyncRenderer, IncompleteRenderError, RenderOptions
+from valiopdf import AsyncRenderer, IncompleteRenderError, RenderOptions
 
 pytestmark = pytest.mark.browser
 

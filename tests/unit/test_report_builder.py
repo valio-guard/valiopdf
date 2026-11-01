@@ -57,7 +57,7 @@ def test_render_report_rejects_reported_resource_failures() -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
-            headers={"Content-Type": "application/pdf", "X-DravenPdf-Resource-Errors": "1"},
+            headers={"Content-Type": "application/pdf", "X-ValioPdf-Resource-Errors": "1"},
             content=b"%PDF-1.4\n",
         )
 

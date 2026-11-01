@@ -14,8 +14,8 @@ import pikepdf
 import pypdfium2 as pdfium
 import pytest
 
-from dravenpdf import AsyncRenderer, PdfDocument
-from dravenpdf.render.pool import DEFAULT_LAUNCH_ARGS, BrowserPool
+from valiopdf import AsyncRenderer, PdfDocument
+from valiopdf.render.pool import DEFAULT_LAUNCH_ARGS, BrowserPool
 
 if TYPE_CHECKING:
     from https_fixture import HttpsSites
@@ -68,7 +68,7 @@ _USERS = {"s3cret-alice": "alice", "s3cret-bob": "bob"}
 
 LS_PAGE = b"""<p id="out">waiting</p><script>
 const out = document.getElementById('out');
-const done = t => { out.textContent = t; window.__DRAVENPDF_READY__ = true; };
+const done = t => { out.textContent = t; window.__VALIOPDF_READY__ = true; };
 const token = localStorage.getItem('token');
 if (!token) done('NO TOKEN');
 else fetch('/auth/api', {headers: {Authorization: 'Bearer ' + token}})
@@ -80,14 +80,14 @@ HEADER_PAGE = b"""<p>TENANT PAGE</p>
      onerror="document.body.append(' IMG-FAIL')">
 <p id="api"></p><script>
 fetch('/auth/api2').then(r => r.text()).then(t => {
-  document.getElementById('api').textContent = t; window.__DRAVENPDF_READY__ = true; });
+  document.getElementById('api').textContent = t; window.__VALIOPDF_READY__ = true; });
 </script>"""
 
 
 # IndexedDB login: /auth/idb-write?token=... stores a token, /auth/idb-page shows it.
 IDB_SCRIPT = """<p id="out">waiting</p><script>
 const out = document.getElementById('out');
-const done = t => { out.textContent = t; window.__DRAVENPDF_READY__ = true; };
+const done = t => { out.textContent = t; window.__VALIOPDF_READY__ = true; };
 const open = indexedDB.open('app', 1);
 open.onupgradeneeded = () => open.result.createObjectStore('auth');
 open.onerror = () => done('IDB ERROR');
@@ -230,7 +230,7 @@ async def test_browser_pool(https_sites: HttpsSites) -> AsyncIterator[BrowserPoo
     args = (
         *DEFAULT_LAUNCH_ARGS,
         "--host-resolver-rules=MAP a.test 127.0.0.1,MAP b.test 127.0.0.1,"
-        "MAP bundle.dravenpdf.invalid 127.0.0.1",
+        "MAP bundle.valiopdf.invalid 127.0.0.1",
         f"--ignore-certificate-errors-spki-list={https_sites.spki_hash}",
         "--no-proxy-server",
     )

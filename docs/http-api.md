@@ -1,7 +1,7 @@
 # HTTP API
 
-The service is the `[server]` extra: `pip install "dravenpdf[server]"`. Run it with
-`dravenpdf serve` or the Docker image. Interactive docs are at `/docs` and the
+The service is the `[server]` extra: `pip install "valiopdf[server]"`. Run it with
+`valiopdf serve` or the Docker image. Interactive docs are at `/docs` and the
 OpenAPI schema at `/openapi.json`.
 
 It is **synchronous**: each response body is the result (a PDF, ZIP or JSON).
@@ -10,22 +10,22 @@ There is no job queue.
 ## Running
 
 ```bash
-DRAVENPDF_API_KEY=change-me dravenpdf serve --host 0.0.0.0 --port 8000 --workers 2
+VALIOPDF_API_KEY=change-me valiopdf serve --host 0.0.0.0 --port 8000 --workers 2
 
-docker build -t dravenpdf .
-docker run --init -p 8000:8000 -e DRAVENPDF_API_KEY=change-me dravenpdf
+docker build -t valiopdf .
+docker run --init -p 8000:8000 -e VALIOPDF_API_KEY=change-me valiopdf
 ```
 
 Each worker process runs its own Chromium. Size `--workers` (Docker:
-`DRAVENPDF_WORKERS`) and `DRAVENPDF_MAX_CONCURRENCY` to the memory you have,
+`VALIOPDF_WORKERS`) and `VALIOPDF_MAX_CONCURRENCY` to the memory you have,
 roughly 100–300 MB per concurrent render. Use `--init` (or `init: true` in Compose)
 so Chromium's child processes are reaped.
 
 ## Auth
 
 Every `/v1/*` request must send the header `X-API-Key: <key>`. The key comes
-from `DRAVENPDF_API_KEY`. If that variable is unset the server **refuses to
-start**, unless `DRAVENPDF_AUTH_DISABLED=true` is set explicitly (for local
+from `VALIOPDF_API_KEY`. If that variable is unset the server **refuses to
+start**, unless `VALIOPDF_AUTH_DISABLED=true` is set explicitly (for local
 development only). Keys are compared in constant time. `/healthz`, `/readyz`,
 `/metrics`, `/docs` and `/openapi.json` do not need a key.
 
@@ -42,7 +42,7 @@ development only). Keys are compared in constant time. `/healthz`, `/readyz`,
 
 - `options` is `RenderOptions` (see [library-api.md](library-api.md#renderoptions)):
   paper, size, margins, header/footer, waits, `timeout_ms`, ... Its `timeout_ms` is
-  capped at `DRAVENPDF_RENDER_TIMEOUT_MS`. It covers the whole request, including
+  capped at `VALIOPDF_RENDER_TIMEOUT_MS`. It covers the whole request, including
   time spent waiting for a free browser, starting the network proxy and launching
   Chromium.
 - Every render endpoint takes an optional `auth` object for pages and resources behind
@@ -55,7 +55,7 @@ development only). Keys are compared in constant time. `/healthz`, `/readyz`,
   origin. Storage state is sent as data (Playwright's
   `storage_state(indexed_db=True)` JSON), never a server path. It applies to that
   one render. It is unrelated to `X-API-Key`, which authenticates the caller to
-  dravenpdf. Credential values never appear in error messages, logs, metrics or
+  valiopdf. Credential values never appear in error messages, logs, metrics or
   response headers.
 
   ```bash
@@ -71,7 +71,7 @@ development only). Keys are compared in constant time. `/healthz`, `/readyz`,
   Relative references resolve inside the bundle; files are served from memory and never
   reach the network (other URLs the page loads go through the SSRF guard as usual).
   Paths must be relative, without `..`; a missing file is a 404 counted in
-  `X-DravenPdf-Resource-Errors`. The request body limit applies to the whole bundle.
+  `X-ValioPdf-Resource-Errors`. The request body limit applies to the whole bundle.
 
   ```bash
   curl -X POST http://localhost:8000/v1/render/bundle -H "X-API-Key: $KEY" \
@@ -116,8 +116,8 @@ Page fields are **1-based** strings like `1,3-5,8-` (`8-` = page 8 to the end).
 | `POST /v1/pdf/form/fill` | `file`, `values` (JSON object: text, true/false or an option per field name), `flatten`?, `password`? | `application/pdf` |
 | `POST /v1/pdf/form/flatten` | `file`, `password`? | `application/pdf` |
 | `GET /v1/pdf/signing-keys` | – | `application/json`: `{"keys": [{name, subject, not_after}]}` |
-| `POST /v1/pdf/sign` | `file`, `key` (a configured key's name), `reason`?, `location`?, `contact`?, `field_name`?, visible: `page` (1-based), `x`, `y`, `width`, `height` (points, from bottom-left)?, `timestamp`? (uses `DRAVENPDF_TIMESTAMP_URL`), `password`? | `application/pdf` (the signed file; don't change it afterwards) |
-| `POST /v1/pdf/verify` | `file`, `password`? (an encrypted file is checked as uploaded), `integrity_only`? | `application/json`: `{"ok", "problems": [...], "signatures": [{field, signer, signed_at, intact, valid, trusted, covers_whole_document, timestamped, reason, location, ok}]}`. A signature's `ok` = intact, valid and trusted by `DRAVENPDF_TRUST_ROOTS`. The top-level `ok` judges the document: at least one signature, all `ok` (trust skipped with `integrity_only`), and one covering the whole file; `problems` says what failed |
+| `POST /v1/pdf/sign` | `file`, `key` (a configured key's name), `reason`?, `location`?, `contact`?, `field_name`?, visible: `page` (1-based), `x`, `y`, `width`, `height` (points, from bottom-left)?, `timestamp`? (uses `VALIOPDF_TIMESTAMP_URL`), `password`? | `application/pdf` (the signed file; don't change it afterwards) |
+| `POST /v1/pdf/verify` | `file`, `password`? (an encrypted file is checked as uploaded), `integrity_only`? | `application/json`: `{"ok", "problems": [...], "signatures": [{field, signer, signed_at, intact, valid, trusted, covers_whole_document, timestamped, reason, location, ok}]}`. A signature's `ok` = intact, valid and trusted by `VALIOPDF_TRUST_ROOTS`. The top-level `ok` judges the document: at least one signature, all `ok` (trust skipped with `integrity_only`), and one covering the whole file; `problems` says what failed |
 | `POST /v1/pdf/encrypt` | `file`, `user_password`?, `owner_password`? (random if omitted), `password`? (if the input is already protected), `allow_print`/`allow_copy`/`allow_modify`/`allow_annotate`/`allow_forms`? | `application/pdf` (AES-256) |
 | `POST /v1/pdf/decrypt` | `file`, `password` | `application/pdf` |
 
@@ -125,9 +125,9 @@ Other PDF endpoints refuse password-protected uploads with 422 `pdf_password`;
 decrypt them first. Passwords never appear in responses or logs.
 
 A `stamp` with `html` renders it once per distinct page size (at most
-`DRAVENPDF_MAX_HTML_STAMP_SIZES`, else 422 `limit_exceeded`); the whole request is
-bounded by `DRAVENPDF_RENDER_TIMEOUT_MS` (504 `render_timeout`). Its time is reported
-under `dravenpdf_render_seconds{source="stamp"}`.
+`VALIOPDF_MAX_HTML_STAMP_SIZES`, else 422 `limit_exceeded`); the whole request is
+bounded by `VALIOPDF_RENDER_TIMEOUT_MS` (504 `render_timeout`). Its time is reported
+under `valiopdf_render_seconds{source="stamp"}`.
 
 Every endpoint that returns a changed PDF (merge, split, stamp, form fill, encrypt,
 ...) returns it **without signatures** when an input was signed: the change would
@@ -146,10 +146,10 @@ curl -X POST http://localhost:8000/v1/pdf/merge -H "X-API-Key: $KEY" \
 | `POST /v1/convert/images-to-pdf` | `files` (PNG/JPEG/...), `paper`?, `landscape`?, `margin`? | `application/pdf` |
 | `POST /v1/convert/pdf-to-images` | `file`, `dpi`? (10–600), `format`? (`png`/`jpeg`), `pages`? | `application/zip` (`page-1.png`, ...) |
 
-A page larger than `DRAVENPDF_MAX_IMAGE_MEGAPIXELS` at the requested `dpi` is refused
+A page larger than `VALIOPDF_MAX_IMAGE_MEGAPIXELS` at the requested `dpi` is refused
 before it is rendered, and so is an `images-to-pdf` image (or frame of a multi-frame
 image) with more pixels, before it is decoded. ZIP responses (`split`, `pdf-to-images`) stop at
-`DRAVENPDF_MAX_OUTPUT_MB` of content. Either limit returns 422 `limit_exceeded`.
+`VALIOPDF_MAX_OUTPUT_MB` of content. Either limit returns 422 `limit_exceeded`.
 | `POST /v1/convert/text` | `file` | `application/json`: `{"pages": [str, ...]}` |
 
 ### Operations
@@ -158,28 +158,28 @@ image) with more pixels, before it is decoded. ZIP responses (`split`, `pdf-to-i
 |---|---|
 | `GET /healthz` | The process is up |
 | `GET /readyz` | 200 when the browser pool is running and not saturated, else 503 |
-| `GET /metrics` | Prometheus: `dravenpdf_render_seconds{source}`, `dravenpdf_renders_active`, `dravenpdf_renders_waiting`, `dravenpdf_renders_total`, `dravenpdf_browser_launches_total`, `dravenpdf_browser_restarts_total` |
+| `GET /metrics` | Prometheus: `valiopdf_render_seconds{source}`, `valiopdf_renders_active`, `valiopdf_renders_waiting`, `valiopdf_renders_total`, `valiopdf_browser_launches_total`, `valiopdf_browser_restarts_total` |
 
 Every response has an `X-Request-ID` header (the client's own, if it sent one), and
 every request is logged with it.
 
 Render responses also carry counts from the render report:
-`X-DravenPdf-Resource-Errors` (failed loads and 4xx/5xx sub-resources),
-`X-DravenPdf-Page-Errors` (uncaught JavaScript exceptions) and `X-DravenPdf-Blocked`.
+`X-ValioPdf-Resource-Errors` (failed loads and 4xx/5xx sub-resources),
+`X-ValioPdf-Page-Errors` (uncaught JavaScript exceptions) and `X-ValioPdf-Blocked`.
 Details are in the server log. To fail instead, set `fail_on_resource_errors` or
 `fail_on_page_errors` in `options`.
 
 ## Errors
 
 Error responses are JSON: `{"error": {"code": str, "message": str}}`. The mapping
-lives in `src/dravenpdf/server/errors.py`.
+lives in `src/valiopdf/server/errors.py`.
 
 | Status | `code` | When |
 |---|---|---|
 | 400 | `invalid_request` | Validation error, bad page range, bad stamp arguments |
 | 400 | `invalid_template` | Template can't be parsed or rendered |
 | 401 | `unauthorized` | Missing or wrong API key |
-| 413 | `payload_too_large` | Body larger than `DRAVENPDF_MAX_BODY_MB` (with or without Content-Length) |
+| 413 | `payload_too_large` | Body larger than `VALIOPDF_MAX_BODY_MB` (with or without Content-Length) |
 | 415 | `unsupported_media_type` | An upload that should be a PDF isn't one |
 | 422 | `limit_exceeded` | The result would pass an output limit (image pixels, ZIP size) |
 | 422 | `invalid_pdf` | Looks like a PDF but can't be read |
@@ -196,19 +196,19 @@ lives in `src/dravenpdf/server/errors.py`.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DRAVENPDF_API_KEY` | – (required) | API key |
-| `DRAVENPDF_AUTH_DISABLED` | `false` | Local development only |
-| `DRAVENPDF_MAX_CONCURRENCY` | `4` | Concurrent renders per worker |
-| `DRAVENPDF_MAX_QUEUE` | `16` | Renders waiting before a 503 |
-| `DRAVENPDF_RENDER_TIMEOUT_MS` | `30000` | Upper limit; a request's `timeout_ms` is capped at it |
-| `DRAVENPDF_MAX_BODY_MB` | `25` | Request and upload size limit |
-| `DRAVENPDF_MAX_OUTPUT_MB` | `100` | Content limit for ZIP responses and for all images from `pdf-to-images` |
-| `DRAVENPDF_MAX_HTML_STAMP_SIZES` | `10` | Most distinct page sizes a stamp with `html` may have (one render each) |
-| `DRAVENPDF_MAX_IMAGE_MEGAPIXELS` | `40` | Largest page `pdf-to-images` renders (A4 at 600 dpi is 35), and largest image (or image frame) `images-to-pdf` accepts |
-| `DRAVENPDF_ALLOWED_HOSTS` | – | Comma-separated host allowlist for URLs and sub-resources (`*.example.com` allowed). Unset = any public host |
-| `DRAVENPDF_LOG_LEVEL` | `INFO` | |
-| `DRAVENPDF_CHROMIUM_PATH` | – | Use this Chromium binary instead of Playwright's |
-| `DRAVENPDF_WORKERS` | `1` | Docker image only: worker processes |
-| `DRAVENPDF_SIGNING_KEYS` | – | JSON: `{"name": {"pkcs12": "/keys/x.p12", "password_file": "/run/secrets/x"}}` (or `"password"`). Loaded at startup; a bad key stops the server. Requests name a key; keys are never uploaded |
-| `DRAVENPDF_TIMESTAMP_URL` | – | RFC 3161 timestamp server for `timestamp=true` |
-| `DRAVENPDF_TRUST_ROOTS` | – | Comma-separated PEM/DER files that `/v1/pdf/verify` trusts |
+| `VALIOPDF_API_KEY` | – (required) | API key |
+| `VALIOPDF_AUTH_DISABLED` | `false` | Local development only |
+| `VALIOPDF_MAX_CONCURRENCY` | `4` | Concurrent renders per worker |
+| `VALIOPDF_MAX_QUEUE` | `16` | Renders waiting before a 503 |
+| `VALIOPDF_RENDER_TIMEOUT_MS` | `30000` | Upper limit; a request's `timeout_ms` is capped at it |
+| `VALIOPDF_MAX_BODY_MB` | `25` | Request and upload size limit |
+| `VALIOPDF_MAX_OUTPUT_MB` | `100` | Content limit for ZIP responses and for all images from `pdf-to-images` |
+| `VALIOPDF_MAX_HTML_STAMP_SIZES` | `10` | Most distinct page sizes a stamp with `html` may have (one render each) |
+| `VALIOPDF_MAX_IMAGE_MEGAPIXELS` | `40` | Largest page `pdf-to-images` renders (A4 at 600 dpi is 35), and largest image (or image frame) `images-to-pdf` accepts |
+| `VALIOPDF_ALLOWED_HOSTS` | – | Comma-separated host allowlist for URLs and sub-resources (`*.example.com` allowed). Unset = any public host |
+| `VALIOPDF_LOG_LEVEL` | `INFO` | |
+| `VALIOPDF_CHROMIUM_PATH` | – | Use this Chromium binary instead of Playwright's |
+| `VALIOPDF_WORKERS` | `1` | Docker image only: worker processes |
+| `VALIOPDF_SIGNING_KEYS` | – | JSON: `{"name": {"pkcs12": "/keys/x.p12", "password_file": "/run/secrets/x"}}` (or `"password"`). Loaded at startup; a bad key stops the server. Requests name a key; keys are never uploaded |
+| `VALIOPDF_TIMESTAMP_URL` | – | RFC 3161 timestamp server for `timestamp=true` |
+| `VALIOPDF_TRUST_ROOTS` | – | Comma-separated PEM/DER files that `/v1/pdf/verify` trusts |

@@ -19,7 +19,9 @@ from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
 from pyhanko.sign import fields, signers
 from pyhanko.sign.timestamps.dummy_client import DummyTimeStamper
 
-from dravenpdf import (
+from forms_fixture import build_form
+from signing_fixture import OWNER, USER, encrypted_then_signed, make_p12, make_tsa_material
+from valiopdf import (
     PdfDocument,
     PdfOperationError,
     PdfPasswordError,
@@ -29,10 +31,8 @@ from dravenpdf import (
     SigningKey,
     signature_problems,
 )
-from dravenpdf.document import forms as form_ops
-from dravenpdf.document import signing as sign_ops
-from forms_fixture import build_form
-from signing_fixture import OWNER, USER, encrypted_then_signed, make_p12, make_tsa_material
+from valiopdf.document import forms as form_ops
+from valiopdf.document import signing as sign_ops
 
 PASSWORD = "p12-pass"
 
@@ -355,7 +355,7 @@ def test_cli_sign_and_verify(tmp_path: Path) -> None:
 
     from typer.testing import CliRunner
 
-    from dravenpdf.cli import app
+    from valiopdf.cli import app
 
     p12, cert = material()
     (tmp_path / "key.p12").write_bytes(p12)
@@ -367,7 +367,7 @@ def test_cli_sign_and_verify(tmp_path: Path) -> None:
         app,
         ["sign", str(tmp_path / "in.pdf"), "-o", str(tmp_path / "s.pdf"),
          "--key", str(tmp_path / "key.p12"), "--visible", "1,50,50,200,60", "--reason", "OK"],
-        env={"DRAVENPDF_KEY_PASSWORD": PASSWORD},
+        env={"VALIOPDF_KEY_PASSWORD": PASSWORD},
     )  # fmt: skip
     checked = runner.invoke(
         app, ["verify", str(tmp_path / "s.pdf"), "--trust", str(tmp_path / "root.pem")]
@@ -393,7 +393,7 @@ def test_bad_trust_root_file() -> None:
 def test_cli_verify_exit_codes(tmp_path: Path) -> None:
     from typer.testing import CliRunner
 
-    from dravenpdf.cli import app
+    from valiopdf.cli import app
 
     (tmp_path / "root.pem").write_bytes(material()[1])
     key = SigningKey.from_pkcs12(material()[0], PASSWORD)
@@ -426,7 +426,7 @@ def test_cli_verify_exit_codes(tmp_path: Path) -> None:
 def test_cli_verify_rejects_changes_after_the_last_signature(tmp_path: Path) -> None:
     from typer.testing import CliRunner
 
-    from dravenpdf.cli import app
+    from valiopdf.cli import app
 
     key = SigningKey.from_pkcs12(material()[0], PASSWORD)
     writer = IncrementalPdfFileWriter(io.BytesIO(blank().sign(key).to_bytes()))
@@ -585,15 +585,15 @@ def test_writing_an_opened_encrypted_signed_file(key: SigningKey, pem: bytes) ->
 def test_cli_verify_encrypted_file(tmp_path: Path, key: SigningKey) -> None:
     from typer.testing import CliRunner
 
-    from dravenpdf.cli import app
+    from valiopdf.cli import app
 
     (tmp_path / "enc.pdf").write_bytes(encrypted_then_signed(key))
     (tmp_path / "root.pem").write_bytes(material()[1])
     runner = CliRunner()
     args = ["verify", str(tmp_path / "enc.pdf"), "--trust", str(tmp_path / "root.pem")]
 
-    checked = runner.invoke(app, args, env={"DRAVENPDF_PDF_PASSWORD": USER})
-    missing = runner.invoke(app, args, env={"DRAVENPDF_PDF_PASSWORD": ""})
+    checked = runner.invoke(app, args, env={"VALIOPDF_PDF_PASSWORD": USER})
+    missing = runner.invoke(app, args, env={"VALIOPDF_PDF_PASSWORD": ""})
 
     assert checked.exit_code == 0, checked.output
     assert json.loads(checked.stdout)[0]["ok"] is True
@@ -616,7 +616,7 @@ def test_signed_edits_clone_once_and_warn_at_the_caller(
     edit: Callable[[PdfDocument], object],
     copies: int,
 ) -> None:
-    from dravenpdf.document import pages as ops
+    from valiopdf.document import pages as ops
 
     signed = signed_visibly(key)
     clones: list[object] = []
@@ -651,7 +651,7 @@ def test_sign_checks_the_box(key: SigningKey, box: SignatureBox, message: str) -
 def test_cli_visible_page_is_one_based(tmp_path: Path) -> None:
     from typer.testing import CliRunner
 
-    from dravenpdf.cli import app
+    from valiopdf.cli import app
 
     (tmp_path / "key.p12").write_bytes(material()[0])
     blank().save(tmp_path / "in.pdf")
@@ -660,7 +660,7 @@ def test_cli_visible_page_is_one_based(tmp_path: Path) -> None:
         app,
         ["sign", str(tmp_path / "in.pdf"), "-o", str(tmp_path / "s.pdf"),
          "--key", str(tmp_path / "key.p12"), "--visible", "0,10,10,100,40"],
-        env={"DRAVENPDF_KEY_PASSWORD": PASSWORD},
+        env={"VALIOPDF_KEY_PASSWORD": PASSWORD},
     )  # fmt: skip
 
     assert result.exit_code == 1

@@ -1,8 +1,8 @@
-# dravenpdf
+# valiopdf
 
 HTML to PDF conversion and PDF tools for Python, plus a ready-to-run HTTP service.
 
-dravenpdf renders HTML, URLs and Jinja2 templates to PDF with headless Chromium
+valiopdf renders HTML, URLs and Jinja2 templates to PDF with headless Chromium
 (via Playwright), so what you get matches Chrome's "Print to PDF": modern CSS,
 web fonts, SVG and JavaScript all work. You can then merge, split, rotate, stamp
 and compress the PDFs, convert between PDFs and images, and extract text.
@@ -41,8 +41,8 @@ gate. Rendering starts a local mitmproxy process for each call, so expect extra
 startup time and memory compared with a shared browser.
 
 ```bash
-pip install dravenpdf                 # library + CLI
-pip install "dravenpdf[server]"       # + HTTP service
+pip install valiopdf                 # library + CLI
+pip install "valiopdf[server]"       # + HTTP service
 playwright install chromium           # one-time browser download
 ```
 
@@ -60,7 +60,7 @@ direct access. A denied URL follows the configured `on_blocked` behavior.
 
 ```python
 import asyncio
-from dravenpdf import AsyncRenderer, RenderOptions, HeaderFooter
+from valiopdf import AsyncRenderer, RenderOptions, HeaderFooter
 
 async def main():
     async with AsyncRenderer() as r:
@@ -80,7 +80,7 @@ asyncio.run(main())
 Sync version:
 
 ```python
-from dravenpdf import Renderer, PdfDocument
+from valiopdf import Renderer, PdfDocument
 
 with Renderer() as r:
     r.from_url("https://example.com").save("example.pdf")
@@ -91,30 +91,30 @@ PdfDocument.merge([PdfDocument.open("a.pdf"), PdfDocument.open("b.pdf")]).save("
 ### CLI
 
 ```bash
-dravenpdf render page.html -o page.pdf --paper Letter --landscape
-dravenpdf template invoice.html --data invoice.json -o invoice.pdf
-dravenpdf merge a.pdf b.pdf -o ab.pdf
-dravenpdf stamp ab.pdf --text CONFIDENTIAL -o stamped.pdf
-dravenpdf images report.pdf --dpi 150 -o pages/
+valiopdf render page.html -o page.pdf --paper Letter --landscape
+valiopdf template invoice.html --data invoice.json -o invoice.pdf
+valiopdf merge a.pdf b.pdf -o ab.pdf
+valiopdf stamp ab.pdf --text CONFIDENTIAL -o stamped.pdf
+valiopdf images report.pdf --dpi 150 -o pages/
 ```
 
 ### HTTP service
 
 ```bash
-cp .env.example .env              # replace DRAVENPDF_API_KEY with a unique key
+cp .env.example .env              # replace VALIOPDF_API_KEY with a unique key
 docker compose up --build -d
 curl http://127.0.0.1:8000/readyz
 
 curl -X POST http://127.0.0.1:8000/v1/render/html \
-  -H "X-API-Key: $(sed -n 's/^DRAVENPDF_API_KEY=//p' .env)" \
+  -H "X-API-Key: $(sed -n 's/^VALIOPDF_API_KEY=//p' .env)" \
   -H "Content-Type: application/json" \
   -d '{"html":"<h1>Hello</h1>"}' -o hello.pdf
 ```
 
 Compose binds the API to localhost by default. The local `.env` stays out of git and
-the Docker build context; adjust `DRAVENPDF_PORT`, `DRAVENPDF_WORKERS`, and
-`DRAVENPDF_MAX_CONCURRENCY` there as needed. The image also works without Compose
-via `docker run --init -p 8000:8000 -e DRAVENPDF_API_KEY=... dravenpdf`.
+the Docker build context; adjust `VALIOPDF_PORT`, `VALIOPDF_WORKERS`, and
+`VALIOPDF_MAX_CONCURRENCY` there as needed. The image also works without Compose
+via `docker run --init -p 8000:8000 -e VALIOPDF_API_KEY=... valiopdf`.
 
 All endpoints and settings are in [docs/http-api.md](docs/http-api.md).
 
@@ -137,7 +137,7 @@ The PDF is written to `output/pdf/platform-report.pdf`. To render edited HTML
 using the existing screenshots, omit `--capture-manifest` and `--demo-login`.
 Supply `--output` for another PDF path or `--storage-state` for a Playwright
 authentication-state file when the demo login is unavailable. The script reads the
-PDF API key from `DRAVENPDF_API_KEY` or the local `.env` file. Referenced assets
+PDF API key from `VALIOPDF_API_KEY` or the local `.env` file. Referenced assets
 must be under `--asset-root` (the repository root by default).
 
 ## Documentation

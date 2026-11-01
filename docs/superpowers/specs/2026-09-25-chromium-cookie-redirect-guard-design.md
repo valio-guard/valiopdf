@@ -28,14 +28,14 @@ Before replacing the current route loop, run a disposable Chromium probe that de
 4. In-memory bundle requests can be fulfilled without a network connection; local-file and WebSocket requests remain guarded without interception deadlocks.
 5. A paused-request error, timeout, target detachment, or render cancellation cannot release a request to the network unchecked or leave it paused until the render deadline.
 
-The probe compares headers received by a local server with a Chromium baseline that has the same context, cookies, source page, and redirects but no dravenpdf interception. If any point fails, stop this design and present the observed failure for a revised design. The existing guarded path stays in place until a replacement passes this gate and the full regression suite.
+The probe compares headers received by a local server with a Chromium baseline that has the same context, cookies, source page, and redirects but no valiopdf interception. If any point fails, stop this design and present the observed failure for a revised design. The existing guarded path stays in place until a replacement passes this gate and the full regression suite.
 
 ## Required behavior
 
 - A fresh browser context holds cookies and storage state for each render, loaded before navigation. No authentication state crosses renders.
 - The guard checks each HTTP(S) destination before the request is sent. It retains the current public-IP and allowlist policy, redirect count bound, and `on_blocked="fail"`/`"skip"` outcomes. A blocked redirect target receives no request bytes.
 - The guard continues to reject disallowed `file://` paths, allows only paths under `file_root` where configured, and never lets an HTTP redirect evade those checks. `data:`, `blob:`, and `about:` retain their current treatment.
-- Bundle URLs under `https://bundle.dravenpdf.invalid/` are answered only from `AssetBundle` data, with the current 404 behavior for missing paths. They never resolve or connect to the network.
+- Bundle URLs under `https://bundle.valiopdf.invalid/` are answered only from `AssetBundle` data, with the current 404 behavior for missing paths. They never resolve or connect to the network.
 - WebSockets retain the existing host checks and are closed before connecting when blocked.
 - Page, frame, popup, and worker network traffic all receive the same guard. Service workers remain disabled. Popup support is retained; silently allowing an unguarded popup is forbidden.
 - Configured `RenderAuth` headers are applied to the exact scheme, host, and port of each hop. Browser-managed cookies follow Chromium's SameSite, Secure, path, domain, and third-party-cookie rules. The guard neither invents a `Cookie` value nor copies one from an earlier hop. A page-provided `Authorization` header must not cross an origin boundary.

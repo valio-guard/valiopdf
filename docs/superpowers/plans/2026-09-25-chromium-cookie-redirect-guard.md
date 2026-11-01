@@ -37,10 +37,10 @@ These inputs are easy to miss even after the main cookie tests pass. Their tests
 - `tests/https_fixture.py`: local HTTPS server, ephemeral certificate, test-only browser flags, cookie-policy helper, and wire-header request log; expose its fixtures from `tests/conftest.py`.
 - `tests/integration/test_cookie_https.py`: unguarded Chromium baseline and guarded source/redirect cookie matrix.
 - `tests/integration/test_cdp_probe.py`: permanent feasibility tests for hop, header, bundle, target, and cancellation coverage; initial exploratory code may be discarded after the gate.
-- `src/dravenpdf/render/_cdp_guard.py`: one render's CDP sessions, paused-request lifecycle, target coverage, and CDP response/abort calls.
-- `src/dravenpdf/render/guards.py`: existing URL policy, blocked reporting, file/WebSocket routing, and the install/close boundary for `_cdp_guard.py`.
-- `src/dravenpdf/render/assets.py`: reusable in-memory response data for CDP fulfillment; no network path for the bundle origin.
-- `src/dravenpdf/render/renderer.py`: install guard after creating the page but before loading it, then close the guard before closing its context.
+- `src/valiopdf/render/_cdp_guard.py`: one render's CDP sessions, paused-request lifecycle, target coverage, and CDP response/abort calls.
+- `src/valiopdf/render/guards.py`: existing URL policy, blocked reporting, file/WebSocket routing, and the install/close boundary for `_cdp_guard.py`.
+- `src/valiopdf/render/assets.py`: reusable in-memory response data for CDP fulfillment; no network path for the bundle origin.
+- `src/valiopdf/render/renderer.py`: install guard after creating the page but before loading it, then close the guard before closing its context.
 - `tests/unit/test_guards.py`, `tests/integration/test_auth.py`, and `tests/integration/test_guard_network.py`: policy, credential, popup, failure, and compatibility regressions.
 - `docs/decisions.md`, `docs/architecture.md`, `docs/library-api.md`, `docs/roadmap.md`, and `CLAUDE.md`: describe only behavior proved by tests.
 
@@ -64,7 +64,7 @@ class HttpsSites:
         return [record for record in self.records if f"tag={tag}" in record.path]
 ```
 
-- [ ] **Step 2: Write a browser baseline before using dravenpdf's guard.** Use Playwright directly, install `Strict`, `Lax`, and `None; Secure` cookies with `context.add_cookies()`, and load an image and `fetch()` from the other site. Before navigation, call `Network.setCookieControls` with `enableThirdPartyCookieRestriction=False` for the positive control and `True` for the blocked control; it is test-only and Chromium's API says a reload is required if changed after navigation. Capture server-received headers. Verify that Strict/Lax do not reach the cross-site subresource.
+- [ ] **Step 2: Write a browser baseline before using valiopdf's guard.** Use Playwright directly, install `Strict`, `Lax`, and `None; Secure` cookies with `context.add_cookies()`, and load an image and `fetch()` from the other site. Before navigation, call `Network.setCookieControls` with `enableThirdPartyCookieRestriction=False` for the positive control and `True` for the blocked control; it is test-only and Chromium's API says a reload is required if changed after navigation. Capture server-received headers. Verify that Strict/Lax do not reach the cross-site subresource.
 
 ```python
 assert "none=allowed" in sites.received("cross-none")[0].headers.get("cookie", "")
@@ -96,7 +96,7 @@ assert guarded_wire_cookies == baseline_wire_cookies
 
 ### Task 3: Install the per-render guard
 
-**Files:** Create `src/dravenpdf/render/_cdp_guard.py`; modify `src/dravenpdf/render/guards.py`, `src/dravenpdf/render/assets.py`, `src/dravenpdf/render/renderer.py`; test `tests/unit/test_guards.py`, `tests/integration/test_auth.py`.
+**Files:** Create `src/valiopdf/render/_cdp_guard.py`; modify `src/valiopdf/render/guards.py`, `src/valiopdf/render/assets.py`, `src/valiopdf/render/renderer.py`; test `tests/unit/test_guards.py`, `tests/integration/test_auth.py`.
 
 **Interfaces:** `RequestGuard.install(context: BrowserContext, page: Page, *, deadline: float) -> None` attaches all required interception before `load(page)`. `RequestGuard.close() -> None` resolves or fails pending pauses and detaches sessions. `RequestGuard.blocked` and `check(url)` retain their public behavior. `CdpRequestInterceptor` is internal and receives the owning `RequestGuard` and deadline; it never stores credentials outside that render.
 
@@ -122,12 +122,12 @@ async def continue_paused_request(session: CDPSession, request_id: str) -> None:
 ```
 
 - [ ] **Step 3: Wire lifecycle before navigation.** In `AsyncRenderer._render`, create the fresh context, add storage/cookies, create the page, then call `await guard.install(ctx, page, deadline=deadline)` before `load(page)`. Always run `await guard.close()` in `finally`, including timeout, page crash, and cancellation. Keep `context.route_web_socket` and the file guard for the schemes established in Task 2. Do not leave the old `route.fetch` HTTP loop active in parallel with CDP.
-- [ ] **Step 4: Make bundle response data reusable.** Keep `AssetBundle.lookup(url)` as the source of truth for body and MIME type; factor `AssetBundle.fulfill(route)` so CDP and route paths share the same 200/404 response data and `Cache-Control: no-store`. Assert `bundle.dravenpdf.invalid` is never sent to DNS or network.
+- [ ] **Step 4: Make bundle response data reusable.** Keep `AssetBundle.lookup(url)` as the source of truth for body and MIME type; factor `AssetBundle.fulfill(route)` so CDP and route paths share the same 200/404 response data and `Cache-Control: no-store`. Assert `bundle.valiopdf.invalid` is never sent to DNS or network.
 - [ ] **Step 5: Verify and commit the core.** Run `uv run pytest tests/unit/test_guards.py -q` and `uv run pytest -m browser tests/integration/test_auth.py tests/integration/test_assets.py tests/integration/test_guard_network.py -q`. Commit as `fix: guard Chromium redirect hops without rewriting cookies` only after Task 2's gate and these tests pass.
 
 ### Task 4: Complete target and failure coverage
 
-**Files:** Modify `src/dravenpdf/render/_cdp_guard.py`, `src/dravenpdf/render/guards.py`, `tests/integration/test_cookie_https.py`, `tests/integration/test_auth.py`, `tests/integration/test_guard_network.py`, `tests/unit/test_guards.py`.
+**Files:** Modify `src/valiopdf/render/_cdp_guard.py`, `src/valiopdf/render/guards.py`, `tests/integration/test_cookie_https.py`, `tests/integration/test_auth.py`, `tests/integration/test_guard_network.py`, `tests/unit/test_guards.py`.
 
 **Interfaces:** No new public API. The internal interceptor must cover target creation, detachment, and per-render shutdown before any target can send unchecked network traffic.
 
