@@ -11,11 +11,11 @@ from typing import Any
 
 import pytest
 
-from dravenpdf.errors import RenderError
-from dravenpdf.render import _proxy_gate
-from dravenpdf.render._proxy_ca import ProxyCA
-from dravenpdf.render._proxy_gate import ProxyGate
-from dravenpdf.render._proxy_protocol import ProxyPolicy
+from valiopdf.errors import RenderError
+from valiopdf.render import _proxy_gate
+from valiopdf.render._proxy_ca import ProxyCA
+from valiopdf.render._proxy_gate import ProxyGate
+from valiopdf.render._proxy_protocol import ProxyPolicy
 
 
 async def test_cancelled_close_still_kills_process_and_removes_private_files(
@@ -53,7 +53,7 @@ async def test_cancelled_close_still_kills_process_and_removes_private_files(
         def close(self) -> None:
             self.closed = True
 
-    from dravenpdf.render import _proxy_gate as gate_module
+    from valiopdf.render import _proxy_gate as gate_module
 
     monkeypatch.setattr(gate_module, "_STOP_GRACE", 0.05, raising=False)
     process, directory, transport = Process(), Directory(), Transport()

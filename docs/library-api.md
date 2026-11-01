@@ -3,12 +3,12 @@
 This is the target public API. Signatures may change slightly during
 implementation. If one does, update this file in the same commit.
 
-Everything below is importable from the top-level `dravenpdf` package.
+Everything below is importable from the top-level `valiopdf` package.
 
 ## Rendering
 
 ```python
-from dravenpdf import AsyncRenderer, Renderer, RenderOptions, Margins, HeaderFooter
+from valiopdf import AsyncRenderer, Renderer, RenderOptions, Margins, HeaderFooter
 
 async with AsyncRenderer(
     max_concurrency=4,            # renders at once
@@ -16,7 +16,7 @@ async with AsyncRenderer(
     allowed_hosts=None,           # e.g. ["cdn.example.com", "*.example.org"]
     allow_private_network=False,  # True only for trusted input
     on_blocked="fail",            # or "skip": render without blocked resources
-    executable_path=None,         # default: $DRAVENPDF_CHROMIUM_PATH or Playwright's
+    executable_path=None,         # default: $VALIOPDF_CHROMIUM_PATH or Playwright's
 ) as r:
     doc = await r.from_html("<h1>Hello</h1>")
     doc = await r.from_html(html, RenderOptions(paper="A4", landscape=True),
@@ -49,7 +49,7 @@ with Renderer() as r:
 | `page_ranges` | `str \| None` | `None` | e.g. `"1-3,5"` |
 | `wait_until` | `"load" \| "domcontentloaded" \| "networkidle"` | `"networkidle"` | |
 | `wait_for_selector` | `str \| None` | `None` | |
-| `wait_for_ready_flag` | `bool` | `False` | Wait for `window.__DRAVENPDF_READY__ === true` |
+| `wait_for_ready_flag` | `bool` | `False` | Wait for `window.__VALIOPDF_READY__ === true` |
 | `wait_for_expression` | `str \| None` | `None` | JavaScript expression (or function) polled until truthy, e.g. `"window.charts?.every(c => c.done)"` |
 | `timeout_ms` | `int` | `30000` | For the whole render, including waiting for a free browser slot and launching Chromium |
 | `fail_on_resource_errors` | `bool` | `False` | Raise `IncompleteRenderError` if an image, stylesheet, font, script or fetch fails or returns HTTP 4xx/5xx |
@@ -68,7 +68,7 @@ Environment options apply to that render's own browser context only.
 ### Rendering pages behind a login
 
 ```python
-from dravenpdf import RenderAuth, Cookie, StorageState
+from valiopdf import RenderAuth, Cookie, StorageState
 
 auth = RenderAuth(
     cookies=[Cookie(name="session", value=session_id, url="https://app.example.com")],
@@ -121,7 +121,7 @@ loads.
   WebSocket connections.
 - Limits: 200 cookies, 50 origins, 30 headers per origin, 8 KiB per header value,
   1 MiB of secret values in total (IndexedDB counted as its JSON size).
-- Headers for the asset bundle's origin (`https://bundle.dravenpdf.invalid`) are
+- Headers for the asset bundle's origin (`https://bundle.valiopdf.invalid`) are
   rejected: the bundle is served from memory, so they would never be sent.
 
 ### Preparing the page (Python only)
@@ -164,7 +164,7 @@ to turn problems into an `IncompleteRenderError` (its `.report` has the details)
 ## Working with PDFs
 
 ```python
-from dravenpdf import PdfDocument
+from valiopdf import PdfDocument
 
 doc = PdfDocument.open("in.pdf")                    # or PdfDocument.from_bytes(b)
 doc.page_count                                      # also len(doc)
@@ -234,7 +234,7 @@ filled.flatten_form()              # burn the values into the pages, remove the 
 ### Digital signatures
 
 ```python
-from dravenpdf import SigningKey, SignatureBox
+from valiopdf import SigningKey, SignatureBox
 
 key = SigningKey.from_pkcs12("company.p12", password)    # .p12 / .pfx, or bytes
 signed = doc.sign(
@@ -252,7 +252,7 @@ for sig in signatures:
     sig.intact, sig.valid, sig.trusted, sig.covers_whole_document, sig.timestamped
     sig.ok        # this signature: intact, valid and trusted
 
-from dravenpdf import signature_problems
+from valiopdf import signature_problems
 signature_problems(signatures)         # the document: [] if its signatures vouch for it
 signature_problems(signatures, require_trust=False)   # integrity only
 
@@ -369,7 +369,7 @@ doc = await r.from_html(
 ```
 
 The document is served from a private origin that exists only inside the render
-(`https://bundle.dravenpdf.invalid/`), and every request for that origin is answered
+(`https://bundle.valiopdf.invalid/`), and every request for that origin is answered
 from `assets`, never the network. Relative URLs (including `../` from a stylesheet)
 resolve inside the bundle; a missing file is a 404 in `doc.render_report`. Paths are
 relative with `/` separators and no `..`, empty or `.` parts (else `AssetError`), at
@@ -391,17 +391,17 @@ Template problems raise `TemplateError`.
 
 ## Errors
 
-All exceptions subclass `dravenpdf.errors.DravenPdfError`. See
+All exceptions subclass `valiopdf.errors.ValioPdfError`. See
 [architecture.md](architecture.md#errorspy) for the hierarchy.
 
 ## CLI
 
-`dravenpdf --help` and `dravenpdf COMMAND --help` list every option. Page arguments
+`valiopdf --help` and `valiopdf COMMAND --help` list every option. Page arguments
 are **1-based** (`1,3-5,8-`). `-o -` writes a single PDF to stdout. Library errors
 print one line (`error: ...`) and exit with status 1.
 
 ```
-dravenpdf render      page.html|URL -o out.pdf [--paper A4] [--landscape] [--margin 10mm]
+valiopdf render      page.html|URL -o out.pdf [--paper A4] [--landscape] [--margin 10mm]
                       [--header h.html] [--footer f.html] [--wait-for "#ready"]
                       [--wait-for-ready-flag] [--media print|screen] [--timeout 30]
                       [--allow-host cdn.example.com ...] [--allow-private] [--skip-blocked]
@@ -410,38 +410,38 @@ dravenpdf render      page.html|URL -o out.pdf [--paper A4] [--landscape] [--mar
                       [--timezone Europe/Berlin] [--color-scheme dark] [--reduced-motion reduce]
                       [--prefer-css-page-size] [--css-margins] [--tagged] [--outline]
                       [--wait-for-expression "window.done === true"] [--auth auth.json]
-dravenpdf template    invoice.html --data data.json -o out.pdf [--paper] [--landscape] [--footer]
+valiopdf template    invoice.html --data data.json -o out.pdf [--paper] [--landscape] [--footer]
                       [--auth auth.json]
 # --auth: RenderAuth JSON ({"cookies", "storage_state", "headers"}), or a file saved by
 # Playwright's context.storage_state(path=...). Its contents never appear in messages.
-dravenpdf merge       a.pdf b.pdf ... -o out.pdf
-dravenpdf split       in.pdf -o outdir/ (--every 2 | --range 1-3 --range 4-)
-dravenpdf extract     in.pdf 2-5,8 -o out.pdf
-dravenpdf rotate      in.pdf -o out.pdf [--degrees 90] [--pages 1,3]
-dravenpdf delete      in.pdf 1,3 -o out.pdf
-dravenpdf stamp       in.pdf -o out.pdf (--text DRAFT | --image logo.png | --html s.html | --pdf letterhead.pdf)
+valiopdf merge       a.pdf b.pdf ... -o out.pdf
+valiopdf split       in.pdf -o outdir/ (--every 2 | --range 1-3 --range 4-)
+valiopdf extract     in.pdf 2-5,8 -o out.pdf
+valiopdf rotate      in.pdf -o out.pdf [--degrees 90] [--pages 1,3]
+valiopdf delete      in.pdf 1,3 -o out.pdf
+valiopdf stamp       in.pdf -o out.pdf (--text DRAFT | --image logo.png | --html s.html | --pdf letterhead.pdf)
                       [--opacity] [--angle] [--font-size] [--color] [--width] [--position] [--under] [--pages]
-dravenpdf metadata    in.pdf                          # show info as JSON
-dravenpdf metadata    in.pdf --title "Q3" -o out.pdf  # write a changed copy
-dravenpdf compress    in.pdf -o out.pdf
-dravenpdf form-fields in.pdf                   # JSON
-dravenpdf fill-form   in.pdf --data values.json [--flatten] -o out.pdf
-dravenpdf flatten-form in.pdf -o out.pdf
-dravenpdf encrypt     in.pdf -o out.pdf [--no-print] [--no-copy] [--no-modify] [--no-annotate] [--no-forms]
-                      # passwords: env DRAVENPDF_USER_PASSWORD / DRAVENPDF_OWNER_PASSWORD
+valiopdf metadata    in.pdf                          # show info as JSON
+valiopdf metadata    in.pdf --title "Q3" -o out.pdf  # write a changed copy
+valiopdf compress    in.pdf -o out.pdf
+valiopdf form-fields in.pdf                   # JSON
+valiopdf fill-form   in.pdf --data values.json [--flatten] -o out.pdf
+valiopdf flatten-form in.pdf -o out.pdf
+valiopdf encrypt     in.pdf -o out.pdf [--no-print] [--no-copy] [--no-modify] [--no-annotate] [--no-forms]
+                      # passwords: env VALIOPDF_USER_PASSWORD / VALIOPDF_OWNER_PASSWORD
                       # (or --user-password / --owner-password, visible in the process list)
-dravenpdf decrypt     in.pdf -o out.pdf        # password: env DRAVENPDF_PDF_PASSWORD or prompt
-dravenpdf sign        in.pdf -o out.pdf --key company.p12 [--reason] [--location] [--contact]
+valiopdf decrypt     in.pdf -o out.pdf        # password: env VALIOPDF_PDF_PASSWORD or prompt
+valiopdf sign        in.pdf -o out.pdf --key company.p12 [--reason] [--location] [--contact]
                       [--visible PAGE,X,Y,W,H] [--timestamp-url URL]
-                      # key passphrase: env DRAVENPDF_KEY_PASSWORD or prompt
-dravenpdf verify      in.pdf [--trust ca.pem ...] [--integrity-only]
+                      # key passphrase: env VALIOPDF_KEY_PASSWORD or prompt
+valiopdf verify      in.pdf [--trust ca.pem ...] [--integrity-only]
                       # JSON; exit 1 unless signed, intact, trusted by --trust and covering
                       # the whole file; --integrity-only skips the trust check;
-                      # encrypted file: password in env DRAVENPDF_PDF_PASSWORD (or --password)
-dravenpdf images      in.pdf -o outdir/ [--dpi 150] [--format png|jpeg] [--pages]
-dravenpdf from-images a.png b.jpg -o out.pdf [--paper A4] [--landscape] [--margin 36]
-dravenpdf text        in.pdf                          # pages separated by form feeds
-dravenpdf serve       [--host 127.0.0.1] [--port 8000] [--workers 1]   # needs [server]
+                      # encrypted file: password in env VALIOPDF_PDF_PASSWORD (or --password)
+valiopdf images      in.pdf -o outdir/ [--dpi 150] [--format png|jpeg] [--pages]
+valiopdf from-images a.png b.jpg -o out.pdf [--paper A4] [--landscape] [--margin 36]
+valiopdf text        in.pdf                          # pages separated by form feeds
+valiopdf serve       [--host 127.0.0.1] [--port 8000] [--workers 1]   # needs [server]
 ```
 
 `render` blocks private and localhost addresses like the library does; pass

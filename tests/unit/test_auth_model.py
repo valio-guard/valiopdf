@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from dravenpdf import Cookie, RenderAuth, StorageState
-from dravenpdf.render.auth import MAX_TOTAL_BYTES, canonical_origin, origin_of
+from valiopdf import Cookie, RenderAuth, StorageState
+from valiopdf.render.auth import MAX_TOTAL_BYTES, canonical_origin, origin_of
 
 SECRET = "TOPSECRET-123"
 
@@ -187,8 +187,8 @@ def test_indexed_db_counts_towards_the_total_size() -> None:
 
 def test_headers_for_the_bundle_origin_are_rejected() -> None:
     with pytest.raises(ValidationError, match="served from memory"):
-        RenderAuth(headers={"https://bundle.dravenpdf.invalid": {"X-Key": "s3cret"}})
+        RenderAuth(headers={"https://bundle.valiopdf.invalid": {"X-Key": "s3cret"}})
     # Storage for the bundle's origin is fine: the bundle page runs on it.
     StorageState.model_validate(
-        {"origins": [{"origin": "https://bundle.dravenpdf.invalid", "localStorage": []}]}
+        {"origins": [{"origin": "https://bundle.valiopdf.invalid", "localStorage": []}]}
     )

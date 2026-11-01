@@ -2,7 +2,7 @@
 
 import stat
 
-from dravenpdf.render._proxy_ca import ProxyCA
+from valiopdf.render._proxy_ca import ProxyCA
 
 
 def test_private_unique_ca_and_cleanup() -> None:

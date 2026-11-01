@@ -12,8 +12,8 @@ import pytest
 from PIL import Image
 from typer.testing import CliRunner
 
-from dravenpdf import PdfDocument, PdfOperationError
-from dravenpdf.cli import app
+from valiopdf import PdfDocument, PdfOperationError
+from valiopdf.cli import app
 
 runner = CliRunner()
 
@@ -40,7 +40,7 @@ def run(*args: str | Path) -> str:
 
 
 def test_version() -> None:
-    assert run("--version").startswith("dravenpdf ")
+    assert run("--version").startswith("valiopdf ")
 
 
 def test_merge_extract_delete_rotate(pdf: Path, tmp_path: Path) -> None:
@@ -105,7 +105,7 @@ def test_library_errors_propagate_to_main(pdf: Path, tmp_path: Path) -> None:
 
 def test_main_prints_one_line_errors(pdf: Path, tmp_path: Path) -> None:
     completed = subprocess.run(
-        [sys.executable, "-m", "dravenpdf", "extract", str(pdf), "9", "-o", str(tmp_path / "x")],
+        [sys.executable, "-m", "valiopdf", "extract", str(pdf), "9", "-o", str(tmp_path / "x")],
         capture_output=True,
         text=True,
         check=False,

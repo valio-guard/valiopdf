@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from playwright.async_api import Error as PlaywrightError
 
-from dravenpdf import (
+from valiopdf import (
     AsyncRenderer,
     BrowserPool,
     PoolExhaustedError,
@@ -16,8 +16,8 @@ from dravenpdf import (
     RenderOptions,
     RenderTimeoutError,
 )
-from dravenpdf.render import renderer as renderer_module
-from dravenpdf.render._proxy_gate import ProxyGate
+from valiopdf.render import renderer as renderer_module
+from valiopdf.render._proxy_gate import ProxyGate
 
 
 class FakeContext:

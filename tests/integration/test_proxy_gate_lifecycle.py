@@ -15,10 +15,10 @@ import pytest
 from playwright.async_api import Page
 
 from conftest import Server, requests_tagged
-from dravenpdf import AsyncRenderer, BlockedRequestError, RenderAuth, RenderError
-from dravenpdf.render._proxy_ca import ProxyCA
-from dravenpdf.render._proxy_gate import ProxyGate
-from dravenpdf.render.guards import RequestGuard
+from valiopdf import AsyncRenderer, BlockedRequestError, RenderAuth, RenderError
+from valiopdf.render._proxy_ca import ProxyCA
+from valiopdf.render._proxy_gate import ProxyGate
+from valiopdf.render.guards import RequestGuard
 
 
 async def test_proxy_is_ready_and_uses_private_credentials() -> None:
@@ -32,7 +32,7 @@ async def test_proxy_is_ready_and_uses_private_credentials() -> None:
         try:
             assert gate.proxy_options["server"].startswith("http://127.0.0.1:")
             assert gate.proxy_options["bypass"] == "<-loopback>"
-            assert gate.proxy_options["username"] == "dravenpdf"
+            assert gate.proxy_options["username"] == "valiopdf"
             assert gate.proxy_options["password"] == "test-secret"
             assert not gate.fatal
         finally:
@@ -99,7 +99,7 @@ async def test_policy_block_sends_no_destination_bytes(server: Server) -> None:
             port = int(gate.proxy_options["server"].rsplit(":", 1)[1])
             reader, writer = await asyncio.open_connection("127.0.0.1", port)
             url = server.url("/img.svg?tag=policy-block")
-            token = base64.b64encode(b"dravenpdf:only-this-render").decode()
+            token = base64.b64encode(b"valiopdf:only-this-render").decode()
             writer.write(
                 (
                     f"GET {url} HTTP/1.1\r\nHost: localhost:{server.port}\r\n"
@@ -403,7 +403,7 @@ async def test_eleven_independent_redirecting_images_succeed():
 
 @pytest.mark.browser
 async def test_lost_redirect_session_fails_render(monkeypatch: pytest.MonkeyPatch) -> None:
-    from dravenpdf.render._redirect_gate import RedirectGate
+    from valiopdf.render._redirect_gate import RedirectGate
 
     gates = []
     start = RedirectGate.start.__func__
@@ -428,8 +428,8 @@ async def test_lost_redirect_session_fails_render(monkeypatch: pytest.MonkeyPatc
 async def test_redirect_session_closes_before_browser_slot_release(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from dravenpdf.render._redirect_gate import RedirectGate
-    from dravenpdf.render.pool import BrowserPool
+    from valiopdf.render._redirect_gate import RedirectGate
+    from valiopdf.render.pool import BrowserPool
 
     events: list[str] = []
     release = BrowserPool._release

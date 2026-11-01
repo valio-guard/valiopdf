@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from conftest import SVG, pdf_text
-from dravenpdf import (
+from valiopdf import (
     AsyncRenderer,
     BlockedRequestError,
     PdfDocument,

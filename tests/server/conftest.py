@@ -10,9 +10,9 @@ import pikepdf
 import pytest
 from fastapi.testclient import TestClient
 
-from dravenpdf import BrowserPool, PdfDocument, RenderOptions
-from dravenpdf.server.app import create_app
-from dravenpdf.server.config import Settings
+from valiopdf import BrowserPool, PdfDocument, RenderOptions
+from valiopdf.server.app import create_app
+from valiopdf.server.config import Settings
 
 API_KEY = "test-key"
 AUTH = {"X-API-Key": API_KEY}

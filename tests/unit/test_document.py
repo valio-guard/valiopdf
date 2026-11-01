@@ -7,8 +7,8 @@ from pathlib import Path
 import pikepdf
 import pytest
 
-from dravenpdf import InvalidPdfError, PdfDocument, PdfOperationError
-from dravenpdf.document.pages import parse_page_ranges
+from valiopdf import InvalidPdfError, PdfDocument, PdfOperationError
+from valiopdf.document.pages import parse_page_ranges
 
 
 def make_pdf(pages: int, *, title: str | None = "Sample") -> PdfDocument:
@@ -266,7 +266,7 @@ def test_compress_shrinks_uncompressed_content() -> None:
 
 
 def test_iter_split_builds_parts_on_demand(monkeypatch: pytest.MonkeyPatch) -> None:
-    from dravenpdf.document import pages
+    from valiopdf.document import pages
 
     built: list[int] = []
     original = pages._from_pages

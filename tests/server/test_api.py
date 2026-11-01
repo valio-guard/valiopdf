@@ -15,7 +15,7 @@ from PIL import Image
 from pydantic import ValidationError
 
 from conftest import pdf_text
-from dravenpdf import (
+from valiopdf import (
     BlockedRequestError,
     HttpError,
     IncompleteRenderError,
@@ -28,8 +28,8 @@ from dravenpdf import (
     SigningError,
     TemplateError,
 )
-from dravenpdf.server import deps
-from dravenpdf.server.config import Settings
+from valiopdf.server import deps
+from valiopdf.server.config import Settings
 
 from .conftest import API_KEY, AUTH, FakeRenderer, make_client, pdf_bytes
 
@@ -52,15 +52,15 @@ def png() -> bytes:
 
 
 def test_settings_require_an_api_key() -> None:
-    with pytest.raises(ValidationError, match="DRAVENPDF_API_KEY"):
+    with pytest.raises(ValidationError, match="VALIOPDF_API_KEY"):
         Settings()
     assert Settings(auth_disabled=True).api_key is None
 
 
 def test_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DRAVENPDF_API_KEY", "abc")
-    monkeypatch.setenv("DRAVENPDF_ALLOWED_HOSTS", " cdn.example.com, *.example.org ,")
-    monkeypatch.setenv("DRAVENPDF_MAX_CONCURRENCY", "2")
+    monkeypatch.setenv("VALIOPDF_API_KEY", "abc")
+    monkeypatch.setenv("VALIOPDF_ALLOWED_HOSTS", " cdn.example.com, *.example.org ,")
+    monkeypatch.setenv("VALIOPDF_MAX_CONCURRENCY", "2")
 
     settings = Settings()
 
@@ -99,8 +99,8 @@ def test_metrics(client: TestClient) -> None:
 
     body = client.get("/metrics").text
 
-    assert "dravenpdf_renders_active 0.0" in body
-    assert 'dravenpdf_render_seconds_count{source="html"} 1.0' in body
+    assert "valiopdf_renders_active 0.0" in body
+    assert 'valiopdf_render_seconds_count{source="html"} 1.0' in body
 
 
 def test_request_id(client: TestClient) -> None:
@@ -452,7 +452,7 @@ def test_split_holds_one_part_at_a_time(
 ) -> None:
     import sys
 
-    from dravenpdf.document import pages
+    from valiopdf.document import pages
 
     created: list[object] = []
     still_held: list[int] = []
@@ -485,15 +485,15 @@ def test_render_report_headers(client: TestClient, fake: FakeRenderer) -> None:
 
     response = client.post("/v1/render/html", json={"html": "<p>x</p>"}, headers=AUTH)
 
-    assert response.headers["x-dravenpdf-resource-errors"] == "1"
-    assert response.headers["x-dravenpdf-page-errors"] == "2"
-    assert response.headers["x-dravenpdf-blocked"] == "0"
+    assert response.headers["x-valiopdf-resource-errors"] == "1"
+    assert response.headers["x-valiopdf-page-errors"] == "2"
+    assert response.headers["x-valiopdf-blocked"] == "0"
 
 
 def test_non_render_responses_have_no_report_headers(client: TestClient) -> None:
     response = client.post("/v1/pdf/compress", files={"file": upload(pdf_bytes())}, headers=AUTH)
 
-    assert "x-dravenpdf-resource-errors" not in response.headers
+    assert "x-valiopdf-resource-errors" not in response.headers
 
 
 # ---------------------------------------------------------------- bundles
@@ -651,7 +651,7 @@ def test_bundle_passes_auth(client: TestClient, fake: FakeRenderer, data: str | 
     ("auth", "message"),
     [
         ('{"headers": {"https://a.example": {"X": "s3cret\\r\\n"}}}', "control"),
-        ('{"headers": {"https://bundle.dravenpdf.invalid": {"X": "s3cret"}}}', "never sent"),
+        ('{"headers": {"https://bundle.valiopdf.invalid": {"X": "s3cret"}}}', "never sent"),
         ('{"storage_state": "/var/s3cret.json"}', "storage_state"),
         ("not json s3cret", "auth"),
     ],
@@ -841,8 +841,8 @@ def test_sign_and_verify_endpoints(signing_client: TestClient) -> None:
 
 
 def test_verify_untrusted_and_integrity_only(signing_client: TestClient) -> None:
-    from dravenpdf import PdfDocument, SigningKey
     from signing_fixture import make_p12
+    from valiopdf import PdfDocument, SigningKey
 
     key = SigningKey.from_pkcs12(make_p12("Stranger", "pw")[0], "pw")
     signed = PdfDocument.from_bytes(pdf_bytes()).sign(key).to_bytes()
@@ -865,8 +865,8 @@ def test_verify_untrusted_and_integrity_only(signing_client: TestClient) -> None
 
 
 def test_verify_encrypted_signed_file(signing_client: TestClient) -> None:
-    from dravenpdf import SigningKey
     from signing_fixture import USER, encrypted_then_signed, make_p12
+    from valiopdf import SigningKey
 
     data = encrypted_then_signed(SigningKey.from_pkcs12(make_p12("Enc", "pw")[0], "pw"))
 
@@ -916,8 +916,8 @@ def test_sign_without_configured_keys(client: TestClient) -> None:
 
 
 def test_bad_signing_key_stops_startup(tmp_path: Path) -> None:
-    from dravenpdf.server.app import create_app
     from signing_fixture import make_p12
+    from valiopdf.server.app import create_app
 
     (tmp_path / "k.p12").write_bytes(make_p12("X", "right-pass")[0])
     settings = Settings(
@@ -932,9 +932,9 @@ def test_bad_signing_key_stops_startup(tmp_path: Path) -> None:
 
 
 def test_signing_keys_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DRAVENPDF_API_KEY", "k")
+    monkeypatch.setenv("VALIOPDF_API_KEY", "k")
     monkeypatch.setenv(
-        "DRAVENPDF_SIGNING_KEYS", '{"a": {"pkcs12": "/keys/a.p12", "password_file": "/s/a"}}'
+        "VALIOPDF_SIGNING_KEYS", '{"a": {"pkcs12": "/keys/a.p12", "password_file": "/s/a"}}'
     )
 
     settings = Settings()

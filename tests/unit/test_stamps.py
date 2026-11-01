@@ -6,14 +6,14 @@ import pikepdf
 import pytest
 from PIL import Image
 
-from dravenpdf import (
+from valiopdf import (
     HeaderFooter,
     LimitExceededError,
     PdfDocument,
     PdfOperationError,
     RenderOptions,
 )
-from dravenpdf.document.stamp import pages_by_size, parse_color
+from valiopdf.document.stamp import pages_by_size, parse_color
 
 
 def blank(*sizes: tuple[float, float]) -> PdfDocument:

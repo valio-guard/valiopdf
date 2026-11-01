@@ -6,7 +6,7 @@
 - [uv](https://docs.astral.sh/uv/)
 - Chromium, installed through Playwright (one time): `uv run playwright install --with-deps chromium`.
   To use a different Chromium binary (for example one preinstalled in a container
-  whose version doesn't match Playwright's), set `DRAVENPDF_CHROMIUM_PATH=/path/to/chrome`.
+  whose version doesn't match Playwright's), set `VALIOPDF_CHROMIUM_PATH=/path/to/chrome`.
 - Fonts for the scripts you render (for example `fonts-noto`, `fonts-noto-cjk`,
   `fonts-noto-color-emoji` on Debian/Ubuntu). Missing fonts are the most common
   cause of "wrong looking" PDFs.
@@ -28,8 +28,8 @@ uv run playwright install chromium
 | Type check | `uv run mypy src` |
 | Unit tests (no browser) | `uv run pytest -m "not browser"` |
 | All tests | `uv run pytest` |
-| Run the service | `DRAVENPDF_API_KEY=dev uv run uvicorn dravenpdf.server.app:create_app --factory --reload` |
-| Build the Docker image | `docker build -t dravenpdf .` |
+| Run the service | `VALIOPDF_API_KEY=dev uv run uvicorn valiopdf.server.app:create_app --factory --reload` |
+| Build the Docker image | `docker build -t valiopdf .` |
 
 CI is disabled for now (`.github/workflows/ci.yml` only runs when started by hand),
 so run `make check` and the browser tests locally before pushing.
@@ -60,7 +60,7 @@ that test proxy; production proxies validate against their normal trust store.
 ## Conventions
 
 - Type hints everywhere; `mypy --strict` must pass on `src/`.
-- Library code never prints. It uses `logging.getLogger("dravenpdf....")`.
+- Library code never prints. It uses `logging.getLogger("valiopdf....")`.
 - Keep the CLI and server thin: if logic would be useful from Python, it
   belongs in `render/` or `document/`.
 - When the public API or an endpoint changes, update `docs/library-api.md`
@@ -71,6 +71,6 @@ that test proxy; production proxies validate against their normal trust store.
 
 The image is based on `python:3.12-slim-bookworm`. `playwright install --with-deps
 chromium` adds Chromium and its system libraries at build time, plus Noto fonts. It runs
-`dravenpdf serve` as a non-root user. Chromium runs with `--no-sandbox`
+`valiopdf serve` as a non-root user. Chromium runs with `--no-sandbox`
 inside the container, so the container is the isolation boundary. Don't run
 the service outside a container with untrusted HTML.

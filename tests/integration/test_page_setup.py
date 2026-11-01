@@ -13,8 +13,8 @@ from playwright.async_api import Page
 from typer.testing import CliRunner
 
 from conftest import pdf_text
-from dravenpdf import AsyncRenderer, PdfDocument, RenderOptions, RenderTimeoutError
-from dravenpdf.cli import app
+from valiopdf import AsyncRenderer, PdfDocument, RenderOptions, RenderTimeoutError
+from valiopdf.cli import app
 
 pytestmark = pytest.mark.browser
 

@@ -46,14 +46,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t dravenpdf .
+      - run: docker build -t valiopdf .
       - name: Smoke test the image
         run: |
-          docker run -d --init --name dravenpdf -p 8000:8000 -e DRAVENPDF_API_KEY=ci dravenpdf
+          docker run -d --init --name valiopdf -p 8000:8000 -e VALIOPDF_API_KEY=ci valiopdf
           for i in $(seq 1 30); do curl -sf localhost:8000/readyz && break; sleep 2; done
           curl -sf -X POST localhost:8000/v1/render/html \
             -H "X-API-Key: ci" -H "Content-Type: application/json" \
             -d '{"html":"<h1>smoke</h1>"}' -o out.pdf
           head -c 5 out.pdf | grep -q '%PDF-'
       - if: failure()
-        run: docker logs dravenpdf
+        run: docker logs valiopdf

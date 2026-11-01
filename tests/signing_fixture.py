@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 if TYPE_CHECKING:
-    from dravenpdf import SigningKey
+    from valiopdf import SigningKey
 
 USER, OWNER = "user-pw", "owner-pw"
 

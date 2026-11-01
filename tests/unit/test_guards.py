@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from dravenpdf import BlockedRequestError, RequestGuard
-from dravenpdf.render.auth import RenderAuth
+from valiopdf import BlockedRequestError, RequestGuard
+from valiopdf.render.auth import RenderAuth
 
 DNS = {
     "public.example": ["93.184.216.34"],

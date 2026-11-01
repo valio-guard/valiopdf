@@ -8,8 +8,8 @@ import pytest
 from PIL import Image
 
 from conftest import pdf_text
-from dravenpdf import FormField, PdfDocument, PdfOperationError
 from forms_fixture import build_form
+from valiopdf import FormField, PdfDocument, PdfOperationError
 
 FILL = {
     "name": "Ada Lovelace",
@@ -183,7 +183,7 @@ def test_cli_form_commands(tmp_path: Path) -> None:
 
     from typer.testing import CliRunner
 
-    from dravenpdf.cli import app
+    from valiopdf.cli import app
 
     (tmp_path / "form.pdf").write_bytes(build_form())
     (tmp_path / "values.json").write_text(json.dumps({"name": "Ada", "agree": True}))

@@ -60,7 +60,7 @@ class HttpsSites:
 def _certificate(directory: Path) -> tuple[Path, Path, str]:
     now = datetime.datetime.now(datetime.UTC)
     ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "dravenpdf test CA")])
+    ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "valiopdf test CA")])
     ca_cert = (
         x509.CertificateBuilder()
         .subject_name(ca_name)

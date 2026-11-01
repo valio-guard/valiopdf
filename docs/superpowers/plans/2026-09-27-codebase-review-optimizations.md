@@ -48,7 +48,7 @@ from the steps below, the code is right:
 - `PdfDocument` methods never modify `self`. Any operation that writes a new file starts from `_rewritable()` (directly or through the new `_writable_copy()`) and ends with `_derive()`.
 - Route handlers stay thin; error codes map to statuses only in `server/errors.py`; CPU-bound work runs through `asyncio.to_thread`.
 - The CLI and HTTP take 1-based page strings; the Python API is 0-based.
-- Raise exceptions from `dravenpdf.errors`, never a bare `Exception`.
+- Raise exceptions from `valiopdf.errors`, never a bare `Exception`.
 - Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## Batches (one review package per batch)
@@ -65,23 +65,23 @@ Task 1 guards the proxy subprocess (a security boundary), so its reviewer should
 
 | File | Change | Responsibility after the change |
 |---|---|---|
-| `src/dravenpdf/render/_netpolicy.py` | create | `NetworkPolicy`, DNS helpers, `origin_of`/`canonical_origin`; stdlib plus `dravenpdf.errors` only |
-| `src/dravenpdf/render/guards.py` | modify | `RequestGuard` only; re-exports the policy names |
-| `src/dravenpdf/render/auth.py` | modify | `RenderAuth` models; imports the origin helpers from `_netpolicy` |
-| `src/dravenpdf/render/_proxy_addon.py` | modify | imports only light modules |
-| `src/dravenpdf/__init__.py`, `src/dravenpdf/render/__init__.py` | modify | lazy (PEP 562) exports |
-| `src/dravenpdf/render/_proxy_protocol.py` | modify | `ProxyPolicy.to_json()` / `write_json()` |
-| `src/dravenpdf/render/_proxy_gate.py` | modify | per-attempt confdir built in a worker thread |
-| `src/dravenpdf/render/renderer.py` | modify | builds the proxy policy in a worker thread |
-| `src/dravenpdf/render/_redirect_gate.py` | modify | owns `MAX_REDIRECTS`; the only redirect-cap enforcer |
-| `src/dravenpdf/document/_pdfium.py` | modify | `open_pdf(..., hold_lock=False)` |
-| `src/dravenpdf/document/images.py` | modify | `iter_pdf_to_images`, encoding outside the lock, input pixel cap |
-| `src/dravenpdf/document/stamp.py` | modify | `pages_by_size`, `_size_key`; `_place` takes the geometry |
-| `src/dravenpdf/document/pdf.py` | modify | `_writable_copy`, cached `_readable_bytes`, `iter_images`, bounded `stamp_html`, library-owned encrypt/sign rules |
-| `src/dravenpdf/errors.py` | modify | `describe_validation_errors` (shared) |
-| `src/dravenpdf/server/deps.py` | modify | `within_deadline`, `json_object_field` |
-| `src/dravenpdf/server/config.py` | modify | `max_html_stamp_sizes` |
-| `src/dravenpdf/server/routes/*.py`, `server/middleware.py`, `server/errors.py`, `cli.py` | modify | use the shared helpers and library rules |
+| `src/valiopdf/render/_netpolicy.py` | create | `NetworkPolicy`, DNS helpers, `origin_of`/`canonical_origin`; stdlib plus `valiopdf.errors` only |
+| `src/valiopdf/render/guards.py` | modify | `RequestGuard` only; re-exports the policy names |
+| `src/valiopdf/render/auth.py` | modify | `RenderAuth` models; imports the origin helpers from `_netpolicy` |
+| `src/valiopdf/render/_proxy_addon.py` | modify | imports only light modules |
+| `src/valiopdf/__init__.py`, `src/valiopdf/render/__init__.py` | modify | lazy (PEP 562) exports |
+| `src/valiopdf/render/_proxy_protocol.py` | modify | `ProxyPolicy.to_json()` / `write_json()` |
+| `src/valiopdf/render/_proxy_gate.py` | modify | per-attempt confdir built in a worker thread |
+| `src/valiopdf/render/renderer.py` | modify | builds the proxy policy in a worker thread |
+| `src/valiopdf/render/_redirect_gate.py` | modify | owns `MAX_REDIRECTS`; the only redirect-cap enforcer |
+| `src/valiopdf/document/_pdfium.py` | modify | `open_pdf(..., hold_lock=False)` |
+| `src/valiopdf/document/images.py` | modify | `iter_pdf_to_images`, encoding outside the lock, input pixel cap |
+| `src/valiopdf/document/stamp.py` | modify | `pages_by_size`, `_size_key`; `_place` takes the geometry |
+| `src/valiopdf/document/pdf.py` | modify | `_writable_copy`, cached `_readable_bytes`, `iter_images`, bounded `stamp_html`, library-owned encrypt/sign rules |
+| `src/valiopdf/errors.py` | modify | `describe_validation_errors` (shared) |
+| `src/valiopdf/server/deps.py` | modify | `within_deadline`, `json_object_field` |
+| `src/valiopdf/server/config.py` | modify | `max_html_stamp_sizes` |
+| `src/valiopdf/server/routes/*.py`, `server/middleware.py`, `server/errors.py`, `cli.py` | modify | use the shared helpers and library rules |
 
 ---
 
@@ -89,15 +89,15 @@ Task 1 guards the proxy subprocess (a security boundary), so its reviewer should
 
 ### Task 1: Light imports for the proxy subprocess
 
-Every render starts `mitmdump -s _proxy_addon.py`. Today the addon imports `dravenpdf.errors`, which runs `dravenpdf/__init__.py`, which imports pikepdf, pypdfium2, playwright, pydantic, jinja2, PIL, img2pdf and pyhanko. That was measured at about 330 ms per render. After this task the addon loads none of them.
+Every render starts `mitmdump -s _proxy_addon.py`. Today the addon imports `valiopdf.errors`, which runs `valiopdf/__init__.py`, which imports pikepdf, pypdfium2, playwright, pydantic, jinja2, PIL, img2pdf and pyhanko. That was measured at about 330 ms per render. After this task the addon loads none of them.
 
 **Files:**
-- Create: `src/dravenpdf/render/_netpolicy.py`
-- Modify: `src/dravenpdf/render/guards.py:14-140`, `src/dravenpdf/render/auth.py:63,75-111`, `src/dravenpdf/render/_proxy_addon.py:16-20`, `src/dravenpdf/__init__.py`, `src/dravenpdf/render/__init__.py`
+- Create: `src/valiopdf/render/_netpolicy.py`
+- Modify: `src/valiopdf/render/guards.py:14-140`, `src/valiopdf/render/auth.py:63,75-111`, `src/valiopdf/render/_proxy_addon.py:16-20`, `src/valiopdf/__init__.py`, `src/valiopdf/render/__init__.py`
 - Test: `tests/unit/test_proxy_imports.py` (new)
 
 **Interfaces:**
-- Produces: `dravenpdf.render._netpolicy` with `Resolver`, `resolve_host`, `NetworkPolicy`, `origin_of`, `canonical_origin`, `_is_public`, `_normalize_host`, `_raise_if`. `guards` and `auth` keep re-exporting the public ones, so existing imports keep working.
+- Produces: `valiopdf.render._netpolicy` with `Resolver`, `resolve_host`, `NetworkPolicy`, `origin_of`, `canonical_origin`, `_is_public`, `_normalize_host`, `_raise_if`. `guards` and `auth` keep re-exporting the public ones, so existing imports keep working.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -118,10 +118,10 @@ HEAVY = {"pikepdf", "pypdfium2", "playwright", "pydantic", "jinja2", "PIL", "img
 def test_proxy_addon_imports_no_heavy_packages() -> None:
     code = (
         "import sys\n"
-        "import dravenpdf.render._proxy_addon\n"
+        "import valiopdf.render._proxy_addon\n"
         f"print(sorted({{m.split('.')[0] for m in sys.modules}} & {sorted(HEAVY)!r}))\n"
     )
-    env = {k: v for k, v in os.environ.items() if not k.startswith("DRAVENPDF_PROXY_")}
+    env = {k: v for k, v in os.environ.items() if not k.startswith("VALIOPDF_PROXY_")}
     result = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, check=True, env=env
     )
@@ -130,13 +130,13 @@ def test_proxy_addon_imports_no_heavy_packages() -> None:
 
 
 def test_package_exports_still_resolve() -> None:
-    import dravenpdf
-    import dravenpdf.render
+    import valiopdf
+    import valiopdf.render
 
-    for name in dravenpdf.__all__:
-        assert getattr(dravenpdf, name) is not None
-    for name in dravenpdf.render.__all__:
-        assert getattr(dravenpdf.render, name) is not None
+    for name in valiopdf.__all__:
+        assert getattr(valiopdf, name) is not None
+    for name in valiopdf.render.__all__:
+        assert getattr(valiopdf.render, name) is not None
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -146,14 +146,14 @@ Expected: `test_proxy_addon_imports_no_heavy_packages` FAILS, listing `['PIL', '
 
 - [ ] **Step 3: Create `_netpolicy.py` by moving code, unchanged**
 
-Create `src/dravenpdf/render/_netpolicy.py`. Its body is code **moved verbatim**; do not edit the logic.
+Create `src/valiopdf/render/_netpolicy.py`. Its body is code **moved verbatim**; do not edit the logic.
 
 ```python
 """Network policy shared by the renderer and the per-render proxy process.
 
 The proxy subprocess (mitmdump) imports this for every render, so it must stay light:
-the standard library and ``dravenpdf.errors`` only. Never import pydantic, playwright,
-pikepdf or other dravenpdf modules here (tests/unit/test_proxy_imports.py checks).
+the standard library and ``valiopdf.errors`` only. Never import pydantic, playwright,
+pikepdf or other valiopdf modules here (tests/unit/test_proxy_imports.py checks).
 """
 
 from __future__ import annotations
@@ -165,10 +165,10 @@ from collections.abc import Awaitable, Callable, Iterable
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
-from dravenpdf.errors import BlockedRequestError
+from valiopdf.errors import BlockedRequestError
 
 if TYPE_CHECKING:
-    from dravenpdf.render.assets import AssetBundle
+    from valiopdf.render.assets import AssetBundle
 
 Resolver = Callable[[str], Awaitable[list[str]]]
 
@@ -178,30 +178,30 @@ _DEFAULT_PORTS = {"http": 80, "https": 443}
 ```
 
 Then append, in this order and byte for byte:
-1. `canonical_origin` and `origin_of`, from `src/dravenpdf/render/auth.py:75-111`.
-2. `resolve_host`, `_is_public`, `_normalize_host`, `_raise_if` and the whole `NetworkPolicy` class, from `src/dravenpdf/render/guards.py:46-140`, but without `_host_port` (lines 63-69), which stays in `guards.py` because only `RequestGuard` uses it.
+1. `canonical_origin` and `origin_of`, from `src/valiopdf/render/auth.py:75-111`.
+2. `resolve_host`, `_is_public`, `_normalize_host`, `_raise_if` and the whole `NetworkPolicy` class, from `src/valiopdf/render/guards.py:46-140`, but without `_host_port` (lines 63-69), which stays in `guards.py` because only `RequestGuard` uses it.
 
 - [ ] **Step 4: Point the old modules at the new one**
 
-In `src/dravenpdf/render/auth.py`:
+In `src/valiopdf/render/auth.py`:
 - delete `_DEFAULT_PORTS` (line 63) and the two moved functions (lines 75-111);
 - add this after the other imports:
 
 ```python
-# Re-exported: callers and tests import these from dravenpdf.render.auth.
-from dravenpdf.render._netpolicy import canonical_origin as canonical_origin
-from dravenpdf.render._netpolicy import origin_of as origin_of
+# Re-exported: callers and tests import these from valiopdf.render.auth.
+from valiopdf.render._netpolicy import canonical_origin as canonical_origin
+from valiopdf.render._netpolicy import origin_of as origin_of
 ```
 
 (The redundant `as` aliases mark an explicit re-export for `mypy --strict`. Don't add an `__all__` to `auth.py`.)
 
-In `src/dravenpdf/render/guards.py`:
+In `src/valiopdf/render/guards.py`:
 - delete lines 38 (`Resolver`), 42-43 (the scheme constants), 46-60 (`resolve_host`, `_is_public`, `_normalize_host`), 72-140 (`_raise_if`, `NetworkPolicy`);
 - delete the now-unused imports `ipaddress` and `socket`;
-- replace `from dravenpdf.render.auth import origin_of` with:
+- replace `from valiopdf.render.auth import origin_of` with:
 
 ```python
-from dravenpdf.render._netpolicy import (
+from valiopdf.render._netpolicy import (
     NetworkPolicy as NetworkPolicy,
     Resolver as Resolver,
     _raise_if,
@@ -210,20 +210,20 @@ from dravenpdf.render._netpolicy import (
 )
 ```
 
-In `src/dravenpdf/render/_proxy_addon.py`, replace lines 16-20 with:
+In `src/valiopdf/render/_proxy_addon.py`, replace lines 16-20 with:
 
 ```python
-from dravenpdf.errors import BlockedRequestError
-from dravenpdf.render._netpolicy import NetworkPolicy, Resolver, origin_of, resolve_host
-from dravenpdf.render._proxy_protocol import ProxyPolicy, send_event
-from dravenpdf.render.assets import AssetBundle
+from valiopdf.errors import BlockedRequestError
+from valiopdf.render._netpolicy import NetworkPolicy, Resolver, origin_of, resolve_host
+from valiopdf.render._proxy_protocol import ProxyPolicy, send_event
+from valiopdf.render.assets import AssetBundle
 ```
 
 Also delete the stale comment at `_proxy_addon.py:81-82` ("A render-wide budget is conservative…"): the budget it describes no longer exists.
 
 - [ ] **Step 5: Make the package `__init__`s lazy**
 
-Replace `src/dravenpdf/render/__init__.py` with:
+Replace `src/valiopdf/render/__init__.py` with:
 
 ```python
 """HTML to PDF with headless Chromium."""
@@ -234,20 +234,20 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dravenpdf.render.guards import RequestGuard
-    from dravenpdf.render.pool import BrowserPool
-    from dravenpdf.render.renderer import AsyncRenderer
-    from dravenpdf.render.sync import Renderer
+    from valiopdf.render.guards import RequestGuard
+    from valiopdf.render.pool import BrowserPool
+    from valiopdf.render.renderer import AsyncRenderer
+    from valiopdf.render.sync import Renderer
 
 __all__ = ["AsyncRenderer", "BrowserPool", "Renderer", "RequestGuard"]
 
-# Imported on first use: the proxy subprocess imports dravenpdf.render._netpolicy and
+# Imported on first use: the proxy subprocess imports valiopdf.render._netpolicy and
 # must not pay for playwright (see tests/unit/test_proxy_imports.py).
 _LAZY = {
-    "AsyncRenderer": "dravenpdf.render.renderer",
-    "BrowserPool": "dravenpdf.render.pool",
-    "Renderer": "dravenpdf.render.sync",
-    "RequestGuard": "dravenpdf.render.guards",
+    "AsyncRenderer": "valiopdf.render.renderer",
+    "BrowserPool": "valiopdf.render.pool",
+    "Renderer": "valiopdf.render.sync",
+    "RequestGuard": "valiopdf.render.guards",
 }
 
 
@@ -260,30 +260,30 @@ def __getattr__(name: str) -> object:
     return value
 ```
 
-In `src/dravenpdf/__init__.py`, keep the `dravenpdf.errors` import and the `__version__` block eager, because both are cheap. Move every other import (lines 7-13 and 31-34: `document`, `forms`, `signing`, `options`, `render`, `render.auth`, `render.report`) under `if TYPE_CHECKING:`, and add the same `__getattr__` pattern with this map:
+In `src/valiopdf/__init__.py`, keep the `valiopdf.errors` import and the `__version__` block eager, because both are cheap. Move every other import (lines 7-13 and 31-34: `document`, `forms`, `signing`, `options`, `render`, `render.auth`, `render.report`) under `if TYPE_CHECKING:`, and add the same `__getattr__` pattern with this map:
 
 ```python
 _LAZY = {
-    "PdfDocument": "dravenpdf.document",
-    "FormField": "dravenpdf.document.forms",
-    "SignatureBox": "dravenpdf.document.signing",
-    "SignatureInfo": "dravenpdf.document.signing",
-    "SigningKey": "dravenpdf.document.signing",
-    "signature_problems": "dravenpdf.document.signing",
-    "HeaderFooter": "dravenpdf.options",
-    "Margins": "dravenpdf.options",
-    "RenderOptions": "dravenpdf.options",
-    "Viewport": "dravenpdf.options",
-    "AsyncRenderer": "dravenpdf.render",
-    "BrowserPool": "dravenpdf.render",
-    "Renderer": "dravenpdf.render",
-    "RequestGuard": "dravenpdf.render",
-    "Cookie": "dravenpdf.render.auth",
-    "RenderAuth": "dravenpdf.render.auth",
-    "StorageState": "dravenpdf.render.auth",
-    "FailedRequest": "dravenpdf.render.report",
-    "HttpError": "dravenpdf.render.report",
-    "RenderReport": "dravenpdf.render.report",
+    "PdfDocument": "valiopdf.document",
+    "FormField": "valiopdf.document.forms",
+    "SignatureBox": "valiopdf.document.signing",
+    "SignatureInfo": "valiopdf.document.signing",
+    "SigningKey": "valiopdf.document.signing",
+    "signature_problems": "valiopdf.document.signing",
+    "HeaderFooter": "valiopdf.options",
+    "Margins": "valiopdf.options",
+    "RenderOptions": "valiopdf.options",
+    "Viewport": "valiopdf.options",
+    "AsyncRenderer": "valiopdf.render",
+    "BrowserPool": "valiopdf.render",
+    "Renderer": "valiopdf.render",
+    "RequestGuard": "valiopdf.render",
+    "Cookie": "valiopdf.render.auth",
+    "RenderAuth": "valiopdf.render.auth",
+    "StorageState": "valiopdf.render.auth",
+    "FailedRequest": "valiopdf.render.report",
+    "HttpError": "valiopdf.render.report",
+    "RenderReport": "valiopdf.render.report",
 }
 ```
 
@@ -295,7 +295,7 @@ Run: `uv run pytest tests/unit/test_proxy_imports.py -v`
 Expected: both PASS.
 
 Run: `uv run mypy src && uv run ruff check . && uv run pytest -m "not browser" -q`
-Expected: clean, all pass. If a test monkeypatches `dravenpdf.render.guards.resolve_host` or `_is_public`, point it at `dravenpdf.render._netpolicy`, because the code that calls them now lives there.
+Expected: clean, all pass. If a test monkeypatches `valiopdf.render.guards.resolve_host` or `_is_public`, point it at `valiopdf.render._netpolicy`, because the code that calls them now lives there.
 
 Run: `uv run pytest tests/integration/test_proxy_gate.py tests/integration/test_guard_network.py -q`
 Expected: all pass (these start real proxies).
@@ -303,7 +303,7 @@ Expected: all pass (these start real proxies).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/dravenpdf/render/_netpolicy.py src/dravenpdf/render/guards.py src/dravenpdf/render/auth.py src/dravenpdf/render/_proxy_addon.py src/dravenpdf/__init__.py src/dravenpdf/render/__init__.py tests/unit/test_proxy_imports.py
+git add src/valiopdf/render/_netpolicy.py src/valiopdf/render/guards.py src/valiopdf/render/auth.py src/valiopdf/render/_proxy_addon.py src/valiopdf/__init__.py src/valiopdf/render/__init__.py tests/unit/test_proxy_imports.py
 git commit -m "perf(proxy): keep the per-render proxy's imports light
 
 Move NetworkPolicy and the origin helpers into render/_netpolicy.py and make
@@ -320,7 +320,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Today three things run synchronously on the event loop. `guard.proxy_policy()` base64-encodes the whole asset bundle. Then `ProxyGate.start` runs `TemporaryDirectory`, `copyfile`, `chmod` and a `json.dump` of that bundle, and it repeats this on each of up to 3 attempts. With a multi-MB bundle this stalls every concurrent render.
 
 **Files:**
-- Modify: `src/dravenpdf/render/_proxy_protocol.py:25-32`, `src/dravenpdf/render/_proxy_gate.py:66-156`, `src/dravenpdf/render/renderer.py:292-294`
+- Modify: `src/valiopdf/render/_proxy_protocol.py:25-32`, `src/valiopdf/render/_proxy_gate.py:66-156`, `src/valiopdf/render/renderer.py:292-294`
 - Test: `tests/unit/test_proxy_gate_cleanup.py`
 
 **Interfaces:**
@@ -335,9 +335,9 @@ import stat
 import threading
 from pathlib import Path
 
-from dravenpdf.render import _proxy_gate
-from dravenpdf.render._proxy_ca import ProxyCA
-from dravenpdf.render._proxy_protocol import ProxyPolicy
+from valiopdf.render import _proxy_gate
+from valiopdf.render._proxy_ca import ProxyCA
+from valiopdf.render._proxy_protocol import ProxyPolicy
 
 
 def test_prepare_directory_writes_private_files() -> None:
@@ -419,14 +419,14 @@ Replace `ProxyPolicy.write` (`_proxy_protocol.py:25-32`) with:
 
 - [ ] **Step 4: Build the confdir in a worker thread, serialize once**
 
-In `src/dravenpdf/render/_proxy_gate.py`, add these module-level functions after `_free_loopback_port`:
+In `src/valiopdf/render/_proxy_gate.py`, add these module-level functions after `_free_loopback_port`:
 
 ```python
 def _prepare_directory(
     ca: ProxyCA, policy: bytes, port: int, upstream_ca: Path | None
 ) -> TemporaryDirectory[str]:
     """A private confdir for one mitmdump attempt: CA, policy and config, all 0600."""
-    directory = TemporaryDirectory(prefix="dravenpdf-proxy-")
+    directory = TemporaryDirectory(prefix="valiopdf-proxy-")
     try:
         path = Path(directory.name)
         shutil.copyfile(ca.confdir / "mitmproxy-ca.pem", path / "mitmproxy-ca.pem")
@@ -498,7 +498,7 @@ Delete the old inline copy/chmod/`policy.write`/config lines. `port` is now chos
 
 - [ ] **Step 5: Build the policy off the loop in the renderer**
 
-In `src/dravenpdf/render/renderer.py`, replace:
+In `src/valiopdf/render/renderer.py`, replace:
 
 ```python
                 gate = await ProxyGate.start(
@@ -525,7 +525,7 @@ Expected: all PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/dravenpdf/render/_proxy_protocol.py src/dravenpdf/render/_proxy_gate.py src/dravenpdf/render/renderer.py tests/unit/test_proxy_gate_cleanup.py
+git add src/valiopdf/render/_proxy_protocol.py src/valiopdf/render/_proxy_gate.py src/valiopdf/render/renderer.py tests/unit/test_proxy_gate_cleanup.py
 git commit -m "perf(proxy): serialize the policy once and build the confdir in a thread
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -538,11 +538,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Both `RequestGuard._observe_request` (by walking `redirected_from`) and `RedirectGate._handle` (through CDP) block at more than 10 redirects. The CDP gate is the one that actually stops the request. The guard's copy can record the same overflow a second time, which turns the error into "blocked X (and 1 more)".
 
 **Files:**
-- Modify: `src/dravenpdf/render/guards.py:41,265-283`, `src/dravenpdf/render/_redirect_gate.py:17`
+- Modify: `src/valiopdf/render/guards.py:41,265-283`, `src/valiopdf/render/_redirect_gate.py:17`
 - Test: `tests/integration/test_proxy_gate_lifecycle.py` (browser)
 
 **Interfaces:**
-- Produces: `dravenpdf.render._redirect_gate.MAX_REDIRECTS = 10`. `guards.MAX_REDIRECTS` is removed; `grep -rn MAX_REDIRECTS src tests` must show only `_redirect_gate.py`.
+- Produces: `valiopdf.render._redirect_gate.MAX_REDIRECTS = 10`. `guards.MAX_REDIRECTS` is removed; `grep -rn MAX_REDIRECTS src tests` must show only `_redirect_gate.py`.
 
 - [ ] **Step 1: Write the regression test**
 
@@ -583,7 +583,7 @@ Expected: FAIL with "(and 1 more)" in the message. If it already PASSES, Chromiu
 
 - [ ] **Step 3: Remove the guard's copy**
 
-In `src/dravenpdf/render/guards.py`:
+In `src/valiopdf/render/guards.py`:
 - delete `MAX_REDIRECTS = 10` (line 41);
 - add `Request` to the top-level playwright import: `from playwright.async_api import BrowserContext, Page, Request, Route, WebSocket`;
 - replace `_observe_request` (lines 265-283) with:
@@ -603,9 +603,9 @@ In `src/dravenpdf/render/guards.py`:
 ```
 
 - update the module docstring (lines 6-8) to: "Chromium redirect chains are observed for block messages; a dedicated browser CDP interceptor (`_redirect_gate`) enforces the per-chain redirect cap while the proxy independently checks every network destination."
-- Also move the function-local import in `proxy_policy` (line 184) to the top of the module: `from dravenpdf.render._proxy_protocol import ProxyPolicy`. `_proxy_protocol` imports only the standard library, so there is no cycle. Drop it from the `TYPE_CHECKING` block.
+- Also move the function-local import in `proxy_policy` (line 184) to the top of the module: `from valiopdf.render._proxy_protocol import ProxyPolicy`. `_proxy_protocol` imports only the standard library, so there is no cycle. Drop it from the `TYPE_CHECKING` block.
 
-In `src/dravenpdf/render/_redirect_gate.py`, replace `from dravenpdf.render.guards import MAX_REDIRECTS` with:
+In `src/valiopdf/render/_redirect_gate.py`, replace `from valiopdf.render.guards import MAX_REDIRECTS` with:
 
 ```python
 MAX_REDIRECTS = 10
@@ -620,7 +620,7 @@ Expected: all PASS, including `test_eleventh_redirect_destination_gets_zero_byte
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/dravenpdf/render/guards.py src/dravenpdf/render/_redirect_gate.py tests/integration/test_proxy_gate_lifecycle.py
+git add src/valiopdf/render/guards.py src/valiopdf/render/_redirect_gate.py tests/integration/test_proxy_gate_lifecycle.py
 git commit -m "refactor(guard): leave the redirect cap to RedirectGate alone
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -637,7 +637,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 `pdf_to_images` holds the global pdfium `LOCK` while it PNG/JPEG-encodes every page, so one high-dpi request blocks every other pdfium user on the server. Its bitmaps are also never closed, so the last one is freed by a finalizer after the lock is released. The route collects every image before zipping. `_readable_bytes()` writes a derived document out again on every call.
 
 **Files:**
-- Modify: `src/dravenpdf/document/_pdfium.py`, `src/dravenpdf/document/images.py:78-133`, `src/dravenpdf/document/pdf.py:88-103,385-412,575-582`, `src/dravenpdf/server/routes/convert.py:42-70`, `CLAUDE.md` (pdfium convention line)
+- Modify: `src/valiopdf/document/_pdfium.py`, `src/valiopdf/document/images.py:78-133`, `src/valiopdf/document/pdf.py:88-103,385-412,575-582`, `src/valiopdf/server/routes/convert.py:42-70`, `CLAUDE.md` (pdfium convention line)
 - Test: `tests/unit/test_images_text.py`, `tests/unit/test_document.py`
 
 **Interfaces:**
@@ -655,8 +655,8 @@ import threading
 
 import pikepdf
 
-from dravenpdf.document import _pdfium
-from dravenpdf.document import images as image_ops
+from valiopdf.document import _pdfium
+from valiopdf.document import images as image_ops
 
 
 def pdf_pages(count: int) -> bytes:
@@ -729,7 +729,7 @@ Expected:
 
 - [ ] **Step 3: Allow fine-grained locking in `_pdfium`**
 
-Replace `open_pdf` in `src/dravenpdf/document/_pdfium.py`:
+Replace `open_pdf` in `src/valiopdf/document/_pdfium.py`:
 
 ```python
 @contextmanager
@@ -761,10 +761,10 @@ In `CLAUDE.md`, change the convention "Call pdfium (pypdfium2) only through `doc
 
 - [ ] **Step 4: Rewrite `pdf_to_images` as a lazy iterator**
 
-In `src/dravenpdf/document/images.py`:
+In `src/valiopdf/document/images.py`:
 - change the imports to `from collections.abc import Iterable, Iterator, Sequence`;
 - add `from PIL import Image`;
-- change `from dravenpdf.document._pdfium import open_pdf` to `from dravenpdf.document._pdfium import LOCK, open_pdf`.
+- change `from valiopdf.document._pdfium import open_pdf` to `from valiopdf.document._pdfium import LOCK, open_pdf`.
 
 Replace `pdf_to_images` (lines 78-133) with:
 
@@ -883,7 +883,7 @@ Replace `doc: Any` with `doc: pdfium.PdfDocument` (adding `import pypdfium2 as p
 
 - [ ] **Step 5: `PdfDocument.iter_images` and a cached `_readable_bytes`**
 
-In `src/dravenpdf/document/pdf.py`:
+In `src/valiopdf/document/pdf.py`:
 
 In `__init__`, after `self._original`, add:
 
@@ -930,7 +930,7 @@ After `to_images`, add:
 
 - [ ] **Step 6: Stream images into the ZIP in the route**
 
-In `src/dravenpdf/server/routes/convert.py`:
+In `src/valiopdf/server/routes/convert.py`:
 - add `from collections.abc import Iterator`;
 - add `ZIP_RESPONSE` to the `deps` import;
 - change the decorator to `@router.post("/pdf-to-images", response_class=Response, responses=ZIP_RESPONSE)`;
@@ -975,7 +975,7 @@ Expected: clean.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/dravenpdf/document/_pdfium.py src/dravenpdf/document/images.py src/dravenpdf/document/pdf.py src/dravenpdf/server/routes/convert.py CLAUDE.md tests/unit/test_images_text.py tests/unit/test_document.py
+git add src/valiopdf/document/_pdfium.py src/valiopdf/document/images.py src/valiopdf/document/pdf.py src/valiopdf/server/routes/convert.py CLAUDE.md tests/unit/test_images_text.py tests/unit/test_document.py
 git commit -m "perf(images): encode outside the pdfium lock and stream pages to the ZIP
 
 Close each bitmap under the lock, render pdf-to-images lazily, and cache a
@@ -991,7 +991,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 `max_image_megapixels` only guards `pdf-to-images`. A small upload with huge dimensions can make img2pdf/Pillow decode hundreds of megapixels.
 
 **Files:**
-- Modify: `src/dravenpdf/document/images.py:46-75`, `src/dravenpdf/document/pdf.py:134-147`, `src/dravenpdf/server/routes/convert.py:28-39`, `docs/http-api.md:200`
+- Modify: `src/valiopdf/document/images.py:46-75`, `src/valiopdf/document/pdf.py:134-147`, `src/valiopdf/server/routes/convert.py:28-39`, `docs/http-api.md:200`
 - Test: `tests/unit/test_images_text.py`, `tests/server/test_api.py`
 
 **Interfaces:**
@@ -1039,7 +1039,7 @@ Expected: FAIL (`unexpected keyword argument 'max_pixels'`, then status 200).
 
 - [ ] **Step 3: Implement the cap**
 
-In `src/dravenpdf/document/images.py`:
+In `src/valiopdf/document/images.py`:
 - add `import warnings`;
 - extend the PIL import to `from PIL import Image, UnidentifiedImageError`;
 - add this function above `images_to_pdf`:
@@ -1093,7 +1093,7 @@ Expected: all PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/dravenpdf/document/images.py src/dravenpdf/document/pdf.py src/dravenpdf/server/routes/convert.py docs/http-api.md tests/unit/test_images_text.py tests/server/test_api.py
+git add src/valiopdf/document/images.py src/valiopdf/document/pdf.py src/valiopdf/server/routes/convert.py docs/http-api.md tests/unit/test_images_text.py tests/server/test_api.py
 git commit -m "fix(convert): apply the pixel limit to images-to-pdf inputs
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -1103,10 +1103,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 6: Bounded HTML stamping, with one size-grouping rule
 
-`POST /v1/pdf/stamp` with `html` runs one Chromium render per distinct page size, one after another. Each uses the default 30 s timeout rather than `DRAVENPDF_RENDER_TIMEOUT_MS`, there is no cap on how many sizes there can be, and the size grouping runs on the event loop. `stamp_html` also duplicates `_stamp_each`'s "group by rounded displayed size" rule, and `_place` recomputes the geometry that `_stamp_each` already has.
+`POST /v1/pdf/stamp` with `html` runs one Chromium render per distinct page size, one after another. Each uses the default 30 s timeout rather than `VALIOPDF_RENDER_TIMEOUT_MS`, there is no cap on how many sizes there can be, and the size grouping runs on the event loop. `stamp_html` also duplicates `_stamp_each`'s "group by rounded displayed size" rule, and `_place` recomputes the geometry that `_stamp_each` already has.
 
 **Files:**
-- Modify: `src/dravenpdf/document/stamp.py:100-149`, `src/dravenpdf/document/pdf.py:345-381`, `src/dravenpdf/render/sync.py:145-160`, `src/dravenpdf/server/deps.py`, `src/dravenpdf/server/config.py`, `src/dravenpdf/server/routes/documents.py:125-164`, `docs/http-api.md` (settings table and the stamp section), `docs/library-api.md:333`
+- Modify: `src/valiopdf/document/stamp.py:100-149`, `src/valiopdf/document/pdf.py:345-381`, `src/valiopdf/render/sync.py:145-160`, `src/valiopdf/server/deps.py`, `src/valiopdf/server/config.py`, `src/valiopdf/server/routes/documents.py:125-164`, `docs/http-api.md` (settings table and the stamp section), `docs/library-api.md:333`
 - Test: `tests/unit/test_stamps.py`, `tests/server/conftest.py`, `tests/server/test_api.py`
 
 **Interfaces:**
@@ -1122,8 +1122,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Append to `tests/unit/test_stamps.py`:
 
 ```python
-from dravenpdf import LimitExceededError, RenderOptions
-from dravenpdf.document.stamp import pages_by_size
+from valiopdf import LimitExceededError, RenderOptions
+from valiopdf.document.stamp import pages_by_size
 
 
 class _Renderer:
@@ -1224,7 +1224,7 @@ Expected: FAIL (`ImportError: pages_by_size`, `unexpected keyword argument 'opti
 
 - [ ] **Step 3: One size-grouping rule in `stamp.py`**
 
-In `src/dravenpdf/document/stamp.py`, add after `target_pages`:
+In `src/valiopdf/document/stamp.py`, add after `target_pages`:
 
 ```python
 def _size_key(geometry: _Geometry) -> tuple[float, float]:
@@ -1274,7 +1274,7 @@ The rest of `_place` stays as it is (delete only the `geometry = _geometry(page)
 - [ ] **Step 4: Bounded `stamp_html`**
 
 In `pdf.py`:
-- add `LimitExceededError` to the `dravenpdf.errors` import;
+- add `LimitExceededError` to the `valiopdf.errors` import;
 - replace `stamp_html` (lines 345-381) with:
 
 ```python
@@ -1324,22 +1324,22 @@ In `pdf.py`:
         return await asyncio.to_thread(self._overlay_all, stamps, opacity=opacity, under=under)
 ```
 
-In `src/dravenpdf/render/sync.py`, `Renderer.stamp_html`:
+In `src/valiopdf/render/sync.py`, `Renderer.stamp_html`:
 - add the parameters `options: RenderOptions | None = None, max_sizes: int | None = None`;
 - pass them through as `options=options, max_sizes=max_sizes`;
-- import `RenderOptions` from `dravenpdf.options` if it isn't already.
+- import `RenderOptions` from `valiopdf.options` if it isn't already.
 
 - [ ] **Step 5: Server setting, deadline helper, route**
 
-In `src/dravenpdf/server/config.py`, after `max_image_megapixels`:
+In `src/valiopdf/server/config.py`, after `max_image_megapixels`:
 
 ```python
     # HTML stamps render once per distinct page size.
     max_html_stamp_sizes: int = Field(default=10, ge=1)
 ```
 
-In `src/dravenpdf/server/deps.py`:
-- add `RenderTimeoutError` to the `dravenpdf.errors` import;
+In `src/valiopdf/server/deps.py`:
+- add `RenderTimeoutError` to the `valiopdf.errors` import;
 - add after `timed`:
 
 ```python
@@ -1354,9 +1354,9 @@ async def within_deadline[T](timeout_ms: int, work: Awaitable[T]) -> T:
         ) from None
 ```
 
-In `src/dravenpdf/server/routes/documents.py`:
+In `src/valiopdf/server/routes/documents.py`:
 - add `timed` and `within_deadline` to the `deps` import;
-- add `from dravenpdf.options import RenderOptions`;
+- add `from valiopdf.options import RenderOptions`;
 - replace the `else:` branch of `stamp` with:
 
 ```python
@@ -1375,8 +1375,8 @@ In `src/dravenpdf/server/routes/documents.py`:
 Task 8 replaces the opacity literal here, so leave it as it is.
 
 Docs:
-- in `docs/http-api.md`'s settings table add `| DRAVENPDF_MAX_HTML_STAMP_SIZES | 10 | Most distinct page sizes a stamp with html may have (one render each) |`;
-- where the stamp endpoint is described, add: "`html` renders once per distinct page size; the whole request is bounded by `DRAVENPDF_RENDER_TIMEOUT_MS`."
+- in `docs/http-api.md`'s settings table add `| VALIOPDF_MAX_HTML_STAMP_SIZES | 10 | Most distinct page sizes a stamp with html may have (one render each) |`;
+- where the stamp endpoint is described, add: "`html` renders once per distinct page size; the whole request is bounded by `VALIOPDF_RENDER_TIMEOUT_MS`."
 - in `docs/library-api.md` near line 333, document the `options` and `max_sizes` parameters.
 
 - [ ] **Step 6: Run the tests**
@@ -1390,7 +1390,7 @@ Expected: all PASS (real Chromium).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/dravenpdf/document/stamp.py src/dravenpdf/document/pdf.py src/dravenpdf/render/sync.py src/dravenpdf/server/deps.py src/dravenpdf/server/config.py src/dravenpdf/server/routes/documents.py docs/http-api.md docs/library-api.md tests/unit/test_stamps.py tests/server/conftest.py tests/server/test_api.py
+git add src/valiopdf/document/stamp.py src/valiopdf/document/pdf.py src/valiopdf/render/sync.py src/valiopdf/server/deps.py src/valiopdf/server/config.py src/valiopdf/server/routes/documents.py docs/http-api.md docs/library-api.md tests/unit/test_stamps.py tests/server/conftest.py tests/server/test_api.py
 git commit -m "fix(stamp): bound HTML stamping by the server timeout and a size cap
 
 Share one size-grouping rule between stamp_html and _stamp_each, group sizes
@@ -1406,7 +1406,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 `ops.clone(self._rewritable())` appears 7 times in `pdf.py`. For a signed document `_rewritable()` has already cloned, so the file is written out and parsed again twice.
 
 **Files:**
-- Modify: `src/dravenpdf/document/pdf.py:249,285,305,338,425,431,523,529`
+- Modify: `src/valiopdf/document/pdf.py:249,285,305,338,425,431,523,529`
 - Test: `tests/unit/test_signing.py`
 
 **Interfaces:**
@@ -1420,7 +1420,7 @@ Append to `tests/unit/test_signing.py`. It uses that file's existing signed-docu
 def test_signed_edits_clone_once_and_warn_at_the_caller(
     key: SigningKey, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from dravenpdf.document import pages as ops
+    from valiopdf.document import pages as ops
 
     signed = signed_visibly(key)
     clones: list[object] = []
@@ -1438,7 +1438,7 @@ def test_signed_edits_clone_once_and_warn_at_the_caller(
     assert caught[0].filename == __file__
 ```
 
-Add any missing imports (`pikepdf`, `SignatureInvalidatedWarning` from `dravenpdf`).
+Add any missing imports (`pikepdf`, `SignatureInvalidatedWarning` from `valiopdf`).
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -1469,7 +1469,7 @@ Expected: all PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/dravenpdf/document/pdf.py tests/unit/test_signing.py
+git add src/valiopdf/document/pdf.py tests/unit/test_signing.py
 git commit -m "refactor(document): one _writable_copy() instead of clone(_rewritable())
 
 Signed documents are now copied once per operation instead of twice.
@@ -1491,7 +1491,7 @@ The CLI and HTTP API each re-implement three rules, and they have drifted apart:
 - **Stamp opacity defaults:** 0.3 for text and 1.0 for the others, written out in both front ends.
 
 **Files:**
-- Modify: `src/dravenpdf/document/pdf.py` (`encrypt`, `sign`), `src/dravenpdf/cli.py` (stamp ~418-443, sign ~531-540, encrypt ~613-618), `src/dravenpdf/server/routes/documents.py` (stamp 147-163, encrypt 207-212, sign 323-327), `docs/library-api.md` (encrypt and sign sections)
+- Modify: `src/valiopdf/document/pdf.py` (`encrypt`, `sign`), `src/valiopdf/cli.py` (stamp ~418-443, sign ~531-540, encrypt ~613-618), `src/valiopdf/server/routes/documents.py` (stamp 147-163, encrypt 207-212, sign 323-327), `docs/library-api.md` (encrypt and sign sections)
 - Test: `tests/unit/test_encryption.py`, `tests/unit/test_signing.py`, `tests/unit/test_cli.py`
 
 **Interfaces:**
@@ -1625,7 +1625,7 @@ Expected: all PASS, including `test_encrypt_needs_a_password_or_restriction` (HT
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/dravenpdf/document/pdf.py src/dravenpdf/cli.py src/dravenpdf/server/routes/documents.py docs/library-api.md tests/unit/test_encryption.py tests/unit/test_signing.py tests/unit/test_cli.py
+git add src/valiopdf/document/pdf.py src/valiopdf/cli.py src/valiopdf/server/routes/documents.py docs/library-api.md tests/unit/test_encryption.py tests/unit/test_signing.py tests/unit/test_cli.py
 git commit -m "fix: enforce encrypt, signature-box and opacity rules in the library
 
 The CLI accepted --visible page 0 (signing the last page) and disagreed with
@@ -1639,12 +1639,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 9: Shared helpers for validation errors, JSON objects and the 413 body
 
 **Files:**
-- Modify: `src/dravenpdf/errors.py`, `src/dravenpdf/server/errors.py:55-60`, `src/dravenpdf/cli.py:72-94,314,491,469`, `src/dravenpdf/server/deps.py:84-86`, `src/dravenpdf/server/routes/render.py:121-128`, `src/dravenpdf/server/routes/documents.py:255-262`, `src/dravenpdf/server/routes/convert.py` (pages_arg use), `src/dravenpdf/server/middleware.py:97-116`
+- Modify: `src/valiopdf/errors.py`, `src/valiopdf/server/errors.py:55-60`, `src/valiopdf/cli.py:72-94,314,491,469`, `src/valiopdf/server/deps.py:84-86`, `src/valiopdf/server/routes/render.py:121-128`, `src/valiopdf/server/routes/documents.py:255-262`, `src/valiopdf/server/routes/convert.py` (pages_arg use), `src/valiopdf/server/middleware.py:97-116`
 - Test: `tests/unit/test_cli.py`, `tests/server/test_api.py`
 
 **Interfaces:**
 - Produces:
-  - `dravenpdf.errors.describe_validation_errors(errors: Sequence[Mapping[str, Any]]) -> str`, re-exported by `server/errors.py`;
+  - `valiopdf.errors.describe_validation_errors(errors: Sequence[Mapping[str, Any]]) -> str`, re-exported by `server/errors.py`;
   - `deps.json_object_field(raw: str | None, field: str) -> dict[str, Any] | None`;
   - `cli._read_json_object(path: Path, flag: str) -> dict[str, Any]`.
 - Removes: `cli._pages` and `deps.pages_arg`; callers use `optional_page_ranges(spec, doc.page_count)` directly.
@@ -1691,7 +1691,7 @@ Expected: PASS already. It pins the current behaviour before the refactor.
 
 - [ ] **Step 3: One validation-error formatter**
 
-Move `describe_validation_errors` from `server/errors.py:55-60` to the end of `src/dravenpdf/errors.py`, unchanged except for the signature:
+Move `describe_validation_errors` from `server/errors.py:55-60` to the end of `src/valiopdf/errors.py`, unchanged except for the signature:
 
 ```python
 def describe_validation_errors(errors: Sequence[Mapping[str, Any]]) -> str:
@@ -1707,7 +1707,7 @@ Add `from collections.abc import Mapping, Sequence` and `Any` to `errors.py`'s i
 
 In `server/errors.py`:
 - delete the function;
-- add `from dravenpdf.errors import describe_validation_errors as describe_validation_errors`, so `routes/render.py` keeps importing it from there.
+- add `from valiopdf.errors import describe_validation_errors as describe_validation_errors`, so `routes/render.py` keeps importing it from there.
 
 In `cli.py` `_load_auth`, replace the `problems = ...` expression with:
 
@@ -1715,7 +1715,7 @@ In `cli.py` `_load_auth`, replace the `problems = ...` expression with:
         problems = describe_validation_errors(exc.errors(include_input=False))
 ```
 
-and add it to the `dravenpdf.errors` import.
+and add it to the `valiopdf.errors` import.
 
 - [ ] **Step 4: One JSON-object parser per front end**
 
@@ -1770,13 +1770,13 @@ Delete `cli._pages` (lines 94-95) and `deps.pages_arg` (lines 84-86). Replace ev
 - `_pages(pages, doc)` → `optional_page_ranges(pages, doc.page_count)` (in `cli.py`);
 - `pages_arg(pages, doc)` → `optional_page_ranges(pages, doc.page_count)` (in `routes/documents.py` and `routes/convert.py`).
 
-Import `optional_page_ranges` from `dravenpdf.document.pages` where needed, and remove `pages_arg` from the `deps` imports. Run `grep -rn "pages_arg\|_pages(" src tests`; the result must be empty.
+Import `optional_page_ranges` from `valiopdf.document.pages` where needed, and remove `pages_arg` from the `deps` imports. Run `grep -rn "pages_arg\|_pages(" src tests`; the result must be empty.
 
 - [ ] **Step 6: Build the 413 body with `error_response`**
 
 In `server/middleware.py`:
 - drop `import json`;
-- add `from dravenpdf.server.errors import error_response`;
+- add `from valiopdf.server.errors import error_response`;
 - change the two `await self._reject(send)` calls to `await self._reject(scope, receive, send)`;
 - replace `_reject` with:
 
@@ -1796,7 +1796,7 @@ Expected: all PASS, clean. `test_bad_json_data`, `test_body_limit_*` and the for
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/dravenpdf/errors.py src/dravenpdf/server/errors.py src/dravenpdf/cli.py src/dravenpdf/server/deps.py src/dravenpdf/server/routes/render.py src/dravenpdf/server/routes/documents.py src/dravenpdf/server/routes/convert.py src/dravenpdf/server/middleware.py tests/unit/test_cli.py tests/server/test_api.py
+git add src/valiopdf/errors.py src/valiopdf/server/errors.py src/valiopdf/cli.py src/valiopdf/server/deps.py src/valiopdf/server/routes/render.py src/valiopdf/server/routes/documents.py src/valiopdf/server/routes/convert.py src/valiopdf/server/middleware.py tests/unit/test_cli.py tests/server/test_api.py
 git commit -m "refactor: share validation, JSON-object and 413 helpers across front ends
 
 Bad JSON in the CLI's --data is now a one-line error instead of a traceback.
@@ -1815,5 +1815,5 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] `grep -rn "ops.clone(self._rewritable" src` is empty.
 - [ ] `grep -rn "MAX_REDIRECTS" src` shows only `_redirect_gate.py`.
 - [ ] `grep -rn "pages_arg\|0.3 if opacity" src` is empty.
-- [ ] `uv run python -X importtime -c "import dravenpdf.render._proxy_addon" 2>&1 | grep -E "pikepdf|playwright|pydantic"` is empty.
+- [ ] `uv run python -X importtime -c "import valiopdf.render._proxy_addon" 2>&1 | grep -E "pikepdf|playwright|pydantic"` is empty.
 - [ ] Update the status line in `docs/roadmap.md` only if a milestone changed (none is expected).

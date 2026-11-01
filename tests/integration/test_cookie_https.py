@@ -10,11 +10,11 @@ from urllib.parse import parse_qs, quote, urlsplit
 import pytest
 from playwright.async_api import BrowserContext, Page
 
-from dravenpdf import AsyncRenderer, Cookie, RenderAuth
-from dravenpdf.render._proxy_gate import ProxyGate
-from dravenpdf.render.assets import ORIGIN as BUNDLE_ORIGIN
-from dravenpdf.render.pool import DEFAULT_LAUNCH_ARGS, BrowserPool
 from https_fixture import HttpsSites
+from valiopdf import AsyncRenderer, Cookie, RenderAuth
+from valiopdf.render._proxy_gate import ProxyGate
+from valiopdf.render.assets import ORIGIN as BUNDLE_ORIGIN
+from valiopdf.render.pool import DEFAULT_LAUNCH_ARGS, BrowserPool
 
 pytestmark = pytest.mark.browser
 

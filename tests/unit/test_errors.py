@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from dravenpdf import errors
+from valiopdf import errors
 
 
 @pytest.mark.parametrize(
@@ -17,10 +17,8 @@ from dravenpdf import errors
         (errors.PoolExhaustedError("x"), "busy"),
     ],
 )
-def test_every_error_is_a_dravenpdf_error_with_a_code(
-    exc: errors.DravenPdfError, code: str
-) -> None:
-    assert isinstance(exc, errors.DravenPdfError)
+def test_every_error_is_a_valiopdf_error_with_a_code(exc: errors.ValioPdfError, code: str) -> None:
+    assert isinstance(exc, errors.ValioPdfError)
     assert exc.code == code
     assert exc.message == "x"
 

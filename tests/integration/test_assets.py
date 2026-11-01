@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from conftest import SVG, Server, pdf_text
-from dravenpdf import AssetError, AsyncRenderer, BlockedRequestError, Renderer
-from dravenpdf.render.assets import ORIGIN
+from valiopdf import AssetError, AsyncRenderer, BlockedRequestError, Renderer
+from valiopdf.render.assets import ORIGIN
 
 pytestmark = pytest.mark.browser
 

@@ -9,8 +9,8 @@ import pytest
 from typer.testing import CliRunner
 
 from conftest import Server, pdf_text, requests_tagged
-from dravenpdf import BlockedRequestError, IncompleteRenderError, PdfDocument
-from dravenpdf.cli import app
+from valiopdf import BlockedRequestError, IncompleteRenderError, PdfDocument
+from valiopdf.cli import app
 
 pytestmark = pytest.mark.browser
 

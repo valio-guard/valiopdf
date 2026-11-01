@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from dravenpdf import BrowserPool, InvalidPdfError, PdfDocument, Renderer
-from dravenpdf.render.renderer import inject_base_url
+from valiopdf import BrowserPool, InvalidPdfError, PdfDocument, Renderer
+from valiopdf.render.renderer import inject_base_url
 
 
 @pytest.mark.parametrize(

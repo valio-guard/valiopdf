@@ -1,6 +1,6 @@
-# dravenpdf HTTP service: Python + Chromium (via Playwright) + Noto fonts.
-#   docker build -t dravenpdf .
-#   docker run --init -p 8000:8000 -e DRAVENPDF_API_KEY=change-me dravenpdf
+# valiopdf HTTP service: Python + Chromium (via Playwright) + Noto fonts.
+#   docker build -t valiopdf .
+#   docker run --init -p 8000:8000 -e VALIOPDF_API_KEY=change-me valiopdf
 FROM python:3.12-slim-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
@@ -28,12 +28,12 @@ RUN apt-get update \
 COPY src ./src
 RUN uv sync --locked --no-dev --extra server
 
-RUN useradd --create-home --uid 10001 dravenpdf
-USER dravenpdf
+RUN useradd --create-home --uid 10001 valiopdf
+USER valiopdf
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"
 
-# One Chromium per worker; size workers and DRAVENPDF_MAX_CONCURRENCY to the memory you have.
-CMD ["sh", "-c", "exec dravenpdf serve --host 0.0.0.0 --port 8000 --workers ${DRAVENPDF_WORKERS:-1}"]
+# One Chromium per worker; size workers and VALIOPDF_MAX_CONCURRENCY to the memory you have.
+CMD ["sh", "-c", "exec valiopdf serve --host 0.0.0.0 --port 8000 --workers ${VALIOPDF_WORKERS:-1}"]

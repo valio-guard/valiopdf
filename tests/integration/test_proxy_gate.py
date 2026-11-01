@@ -18,13 +18,13 @@ from pathlib import Path
 import pytest
 from playwright.async_api import Error as PlaywrightError
 
-from dravenpdf import AsyncRenderer, RenderError
-from dravenpdf.render import _proxy_gate as gate_module
-from dravenpdf.render._proxy_ca import ProxyCA
-from dravenpdf.render._proxy_gate import ProxyGate
-from dravenpdf.render.guards import RequestGuard
-from dravenpdf.render.pool import DEFAULT_LAUNCH_ARGS, BrowserPool
 from https_fixture import serve_https
+from valiopdf import AsyncRenderer, RenderError
+from valiopdf.render import _proxy_gate as gate_module
+from valiopdf.render._proxy_ca import ProxyCA
+from valiopdf.render._proxy_gate import ProxyGate
+from valiopdf.render.guards import RequestGuard
+from valiopdf.render.pool import DEFAULT_LAUNCH_ARGS, BrowserPool
 
 pytestmark = pytest.mark.browser
 
@@ -399,7 +399,7 @@ async def test_real_connect_rejects_mismatched_inner_authority(tmp_path: Path) -
                 destination_port = int(origin.rsplit(":", 1)[1])
                 proxy_port = int(gate.proxy_options["server"].rsplit(":", 1)[1])
                 reader, writer = await asyncio.open_connection("127.0.0.1", proxy_port)
-                token = base64.b64encode(b"dravenpdf:authority-test").decode()
+                token = base64.b64encode(b"valiopdf:authority-test").decode()
                 writer.write(
                     (
                         f"CONNECT a.test:{destination_port} HTTP/1.1\r\n"
@@ -434,7 +434,7 @@ async def test_real_addon_exception_fails_render_with_skip_and_zero_wire_bytes(
 ) -> None:
     addon = tmp_path / "inject_failure.py"
     addon.write_text(
-        "from dravenpdf.render._proxy_addon import _load_addon\n"
+        "from valiopdf.render._proxy_addon import _load_addon\n"
         "addon = _load_addon()\n"
         "async def fail(_url):\n"
         "    raise RuntimeError('injected policy failure')\n"

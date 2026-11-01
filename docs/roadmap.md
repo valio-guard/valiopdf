@@ -6,7 +6,7 @@ Status key: ☐ not started · ◐ in progress · ☑ done
 Research, decisions, architecture, API design (this folder).
 
 ## M1 – Project skeleton ☑
-`pyproject.toml` (uv + hatchling, `[server]` extra), `src/dravenpdf` package,
+`pyproject.toml` (uv + hatchling, `[server]` extra), `src/valiopdf` package,
 `errors.py`, `options.py`, ruff/mypy/pytest config, Makefile, CI workflow.
 `RenderOptions.to_pdf_kwargs()` already maps options to Playwright's `page.pdf()`.
 
@@ -26,7 +26,7 @@ Also `overlay` (a page of another PDF as letterhead or background) and `Template
 
 ## M5 – CLI ☑
 Typer commands listed in `library-api.md`, plus `delete`, `metadata`, `compress`,
-`from-images`, `stamp --pdf`, and `python -m dravenpdf`.
+`from-images`, `stamp --pdf`, and `python -m valiopdf`.
 
 ## M6 – HTTP service ☑
 FastAPI app, API key auth, settings, all `/v1` endpoints, error mapping,
